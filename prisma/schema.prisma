@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role     @default(CUSTOMER)
+  phone     String?
+  address   String?
+  createdAt DateTime @default(now())
+  orders    Order[]
+
+  @@map("users")
+}
+
+model Package {
+  id           String  @id @default(cuid())
+  name         String
+  pricePerKg   Int
+  durationDays Int
+  description  String? @db.Text
+  orders       Order[]
+
+  @@map("packages")
+}
+
+model Order {
+  id            String          @id @default(cuid())
+  orderNumber   String          @unique
+  userId        String
+  packageId     String
+  weight        Float
+  totalPrice    Int
+  status        OrderStatus     @default(PENDING)
+  notes         String?         @db.Text
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  user          User            @relation(fields: [userId], references: [id])
+  package       Package         @relation(fields: [packageId], references: [id])
+  statusHistory StatusHistory[]
+
+  @@map("orders")
+}
+
+model StatusHistory {
+  id          String      @id @default(cuid())
+  orderId     String
+  status      OrderStatus
+  description String?     @db.Text
+  createdAt   DateTime    @default(now())
+  order       Order       @relation(fields: [orderId], references: [id])
+
+  @@map("status_histories")
+}
+
+enum Role {
+  CUSTOMER
+  ADMIN
+}
+
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  WASHING
+  DRYING
+  READY
+  DELIVERED
+}
