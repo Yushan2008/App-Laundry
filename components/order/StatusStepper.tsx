@@ -1,31 +1,71 @@
 "use client";
 
 import {
-  Stepper,
-  Step,
-  StepLabel,
-  StepContent,
   Typography,
   Box,
   Chip,
+  useTheme,
 } from "@mui/material";
 import {
   CheckCircle,
   LocalLaundryService,
-  AcUnit,
   Iron,
   Inventory,
   LocalShipping,
   HourglassEmpty,
+  Settings,
 } from "@mui/icons-material";
+import { useThemeMode } from "@/app/context/ThemeContext";
 
 const STATUS_STEPS = [
-  { key: "PENDING", label: "Pesanan Diterima", icon: <HourglassEmpty />, color: "#f59e0b" },
-  { key: "PROCESSING", label: "Sedang Diproses", icon: <CheckCircle />, color: "#3b82f6" },
-  { key: "WASHING", label: "Sedang Dicuci", icon: <LocalLaundryService />, color: "#06b6d4" },
-  { key: "DRYING", label: "Pengeringan & Setrika", icon: <Iron />, color: "#8b5cf6" },
-  { key: "READY", label: "Siap Diambil", icon: <Inventory />, color: "#22c55e" },
-  { key: "DELIVERED", label: "Selesai", icon: <LocalShipping />, color: "#64748b" },
+  {
+    key: "PENDING",
+    label: "Pesanan Diterima",
+    sublabel: "Pesanan sedang menunggu konfirmasi",
+    icon: <HourglassEmpty sx={{ fontSize: 16 }} />,
+    color: "#f59e0b",
+    bgActive: "rgba(245,158,11,0.12)",
+  },
+  {
+    key: "PROCESSING",
+    label: "Sedang Diproses",
+    sublabel: "Cucian sedang dipersiapkan",
+    icon: <Settings sx={{ fontSize: 16 }} />,
+    color: "#3b82f6",
+    bgActive: "rgba(59,130,246,0.12)",
+  },
+  {
+    key: "WASHING",
+    label: "Sedang Dicuci",
+    sublabel: "Cucian sedang dalam proses pencucian",
+    icon: <LocalLaundryService sx={{ fontSize: 16 }} />,
+    color: "#4f46e5",
+    bgActive: "rgba(79,70,229,0.12)",
+  },
+  {
+    key: "DRYING",
+    label: "Pengeringan & Setrika",
+    sublabel: "Cucian sedang dikeringkan dan disetrika",
+    icon: <Iron sx={{ fontSize: 16 }} />,
+    color: "#0d9488",
+    bgActive: "rgba(13,148,136,0.12)",
+  },
+  {
+    key: "READY",
+    label: "Siap Diambil",
+    sublabel: "Cucian sudah bersih dan siap diambil",
+    icon: <Inventory sx={{ fontSize: 16 }} />,
+    color: "#10b981",
+    bgActive: "rgba(16,185,129,0.12)",
+  },
+  {
+    key: "DELIVERED",
+    label: "Selesai",
+    sublabel: "Cucian sudah diambil oleh pelanggan",
+    icon: <LocalShipping sx={{ fontSize: 16 }} />,
+    color: "#64748b",
+    bgActive: "rgba(100,116,139,0.12)",
+  },
 ];
 
 interface StatusHistory {
@@ -41,63 +81,130 @@ interface StatusStepperProps {
 }
 
 export default function StatusStepper({ currentStatus, statusHistory }: StatusStepperProps) {
+  const theme = useTheme();
+  const { mode } = useThemeMode();
+  const isDark = mode === "dark";
   const currentIndex = STATUS_STEPS.findIndex((s) => s.key === currentStatus);
 
-  const getHistoryForStatus = (statusKey: string) => {
-    return statusHistory.find((h) => h.status === statusKey);
-  };
+  const getHistoryForStatus = (statusKey: string) =>
+    statusHistory.find((h) => h.status === statusKey);
 
   return (
     <Box>
-      <Stepper orientation="vertical" activeStep={currentIndex}>
-        {STATUS_STEPS.map((step, index) => {
-          const history = getHistoryForStatus(step.key);
-          const isCompleted = index < currentIndex;
-          const isCurrent = index === currentIndex;
+      {STATUS_STEPS.map((step, index) => {
+        const history = getHistoryForStatus(step.key);
+        const isCompleted = index < currentIndex;
+        const isCurrent = index === currentIndex;
+        const isPending = index > currentIndex;
+        const isLast = index === STATUS_STEPS.length - 1;
 
-          return (
-            <Step key={step.key} completed={isCompleted}>
-              <StepLabel
-                StepIconComponent={() => (
-                  <Box
-                    sx={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: "50%",
-                      bgcolor: isCompleted || isCurrent ? step.color : "#e2e8f0",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: isCompleted || isCurrent ? "white" : "#94a3b8",
-                      fontSize: 16,
-                    }}
-                  >
-                    {step.icon}
-                  </Box>
-                )}
+        return (
+          <Box key={step.key} sx={{ display: "flex", gap: 2 }}>
+            {/* Icon column */}
+            <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+              <Box
+                sx={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: "50%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                  transition: "all 0.3s",
+                  ...(isCompleted && {
+                    background: "linear-gradient(135deg, #4f46e5, #0d9488)",
+                    color: "white",
+                    boxShadow: "0 2px 12px rgba(79,70,229,0.3)",
+                  }),
+                  ...(isCurrent && {
+                    background: `linear-gradient(135deg, ${step.color}, ${step.color}cc)`,
+                    color: "white",
+                    boxShadow: `0 2px 12px ${step.color}4d`,
+                  }),
+                  ...(isPending && {
+                    bgcolor: isDark ? "rgba(255,255,255,0.06)" : "#f1f5f9",
+                    color: isDark ? "#475569" : "#cbd5e1",
+                    border: `2px dashed ${isDark ? "#334155" : "#e2e8f0"}`,
+                  }),
+                }}
               >
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <Typography
-                    variant="body2"
-                    fontWeight={isCurrent ? 700 : isCompleted ? 600 : 400}
-                    color={isCurrent ? "primary" : isCompleted ? "text.primary" : "text.secondary"}
-                  >
-                    {step.label}
-                  </Typography>
-                  {isCurrent && (
-                    <Chip label="Saat ini" size="small" color="primary" sx={{ height: 20 }} />
+                {isCompleted ? (
+                  <CheckCircle sx={{ fontSize: 18, color: "white" }} />
+                ) : (
+                  step.icon
+                )}
+              </Box>
+              {!isLast && (
+                <Box
+                  sx={{
+                    width: 2,
+                    flex: 1,
+                    minHeight: 24,
+                    my: 0.5,
+                    borderRadius: 1,
+                    bgcolor: isCompleted
+                      ? "primary.main"
+                      : isDark
+                      ? "#1e293b"
+                      : "#e2e8f0",
+                    transition: "background-color 0.3s",
+                  }}
+                />
+              )}
+            </Box>
+
+            {/* Content column */}
+            <Box sx={{ flex: 1, pb: isLast ? 0 : 2.5 }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
+                <Typography
+                  variant="body2"
+                  fontWeight={isCurrent ? 700 : isCompleted ? 600 : 400}
+                  color={
+                    isCurrent
+                      ? "text.primary"
+                      : isCompleted
+                      ? "text.primary"
+                      : "text.disabled"
+                  }
+                >
+                  {step.label}
+                </Typography>
+                {isCurrent && (
+                  <Chip
+                    label="Saat ini"
+                    size="small"
+                    sx={{
+                      height: 20,
+                      fontSize: 10,
+                      fontWeight: 700,
+                      background: `linear-gradient(135deg, ${step.color}, ${step.color}cc)`,
+                      color: "white",
+                    }}
+                  />
+                )}
+              </Box>
+
+              {(isCurrent || isCompleted) && (
+                <Box>
+                  {history?.description && (
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      display="block"
+                      sx={{ lineHeight: 1.5 }}
+                    >
+                      {history.description}
+                    </Typography>
                   )}
-                </Box>
-              </StepLabel>
-              <StepContent>
-                {history && (
-                  <Box sx={{ mb: 1 }}>
-                    {history.description && (
-                      <Typography variant="body2" color="text.secondary">
-                        {history.description}
-                      </Typography>
-                    )}
-                    <Typography variant="caption" color="text.secondary">
+                  {history?.createdAt ? (
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: isCurrent ? step.color : "text.disabled",
+                        fontWeight: isCurrent ? 600 : 400,
+                      }}
+                    >
                       {new Date(history.createdAt).toLocaleString("id-ID", {
                         day: "numeric",
                         month: "long",
@@ -106,13 +213,25 @@ export default function StatusStepper({ currentStatus, statusHistory }: StatusSt
                         minute: "2-digit",
                       })}
                     </Typography>
-                  </Box>
-                )}
-              </StepContent>
-            </Step>
-          );
-        })}
-      </Stepper>
+                  ) : (
+                    !history && isCompleted && (
+                      <Typography variant="caption" color="text.disabled">
+                        —
+                      </Typography>
+                    )
+                  )}
+                </Box>
+              )}
+
+              {isPending && (
+                <Typography variant="caption" color="text.disabled" sx={{ fontStyle: "italic" }}>
+                  {step.sublabel}
+                </Typography>
+              )}
+            </Box>
+          </Box>
+        );
+      })}
     </Box>
   );
 }

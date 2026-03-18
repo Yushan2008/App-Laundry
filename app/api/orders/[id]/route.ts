@@ -5,26 +5,32 @@ import { prisma } from "@/lib/prisma";
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const order = await prisma.order.findUnique({
-    where: { id: params.id },
-    include: {
-      user: { select: { id: true, name: true, email: true, phone: true, address: true } },
-      package: true,
-      statusHistory: { orderBy: { createdAt: "asc" } },
-    },
-  });
+    const { id } = await params;
 
-  if (!order) return NextResponse.json({ error: "Pesanan tidak ditemukan" }, { status: 404 });
+    const order = await prisma.order.findUnique({
+      where: { id },
+      include: {
+        user: { select: { id: true, name: true, email: true, phone: true, address: true } },
+        package: true,
+        statusHistory: { orderBy: { createdAt: "asc" } },
+      },
+    });
 
-  // Customer hanya bisa lihat pesanannya sendiri
-  if (session.user.role === "CUSTOMER" && order.userId !== session.user.id) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    if (!order) return NextResponse.json({ error: "Pesanan tidak ditemukan" }, { status: 404 });
+
+    // Customer hanya bisa lihat pesanannya sendiri
+    if (session.user.role === "CUSTOMER" && order.userId !== session.user.id) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    return NextResponse.json({ order });
+  } catch {
+    return NextResponse.json({ error: "Terjadi kesalahan" }, { status: 500 });
   }
-
-  return NextResponse.json({ order });
 }

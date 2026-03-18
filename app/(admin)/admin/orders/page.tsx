@@ -14,15 +14,17 @@ import {
   TableRow,
   Chip,
   Button,
-  Paper,
-  ToggleButtonGroup,
-  ToggleButton,
+  useTheme,
 } from "@mui/material";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AdminSidebar from "@/components/layout/AdminSidebar";
+import { useThemeMode } from "@/app/context/ThemeContext";
 
-const STATUS_CONFIG: Record<string, { label: string; color: "default" | "warning" | "info" | "primary" | "secondary" | "success" | "error" }> = {
+const STATUS_CONFIG: Record<
+  string,
+  { label: string; color: "default" | "warning" | "info" | "primary" | "secondary" | "success" | "error" }
+> = {
   PENDING: { label: "Menunggu", color: "warning" },
   PROCESSING: { label: "Diproses", color: "info" },
   WASHING: { label: "Dicuci", color: "primary" },
@@ -45,8 +47,8 @@ interface Order {
   id: string;
   orderNumber: string;
   status: string;
-  weight: number;
-  totalPrice: number;
+  weight: number | null;
+  totalPrice: number | null;
   createdAt: string;
   package: { name: string };
   user: { name: string; phone: string | null };
@@ -54,9 +56,13 @@ interface Order {
 
 export default function AdminOrdersPage() {
   const router = useRouter();
+  const theme = useTheme();
+  const { mode } = useThemeMode();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("");
+
+  const isDark = mode === "dark";
 
   const fetchOrders = (status: string) => {
     setLoading(true);
@@ -69,81 +75,134 @@ export default function AdminOrdersPage() {
       });
   };
 
-  useEffect(() => {
-    fetchOrders(filter);
-  }, [filter]);
+  useEffect(() => { fetchOrders(filter); }, [filter]);
 
   return (
-    <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "#f8fafc" }}>
+    <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "background.default" }}>
       <AdminSidebar />
-      <Box sx={{ flexGrow: 1, p: 4 }}>
-        <Typography variant="h4" fontWeight={700} gutterBottom>
-          Kelola Pesanan
-        </Typography>
-        <Typography color="text.secondary" mb={3}>
-          Daftar semua pesanan pelanggan
-        </Typography>
+      <Box sx={{ flexGrow: 1, p: { xs: 2, md: 4 }, overflow: "auto" }}>
+        {/* Header */}
+        <Box sx={{ mb: 4 }}>
+          <Typography variant="h4" fontWeight={800} color="text.primary" gutterBottom>
+            Kelola Pesanan
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Daftar semua pesanan pelanggan — update status pesanan di sini
+          </Typography>
+        </Box>
 
-        {/* Filter */}
-        <Box sx={{ mb: 3, overflowX: "auto" }}>
-          <ToggleButtonGroup
-            value={filter}
-            exclusive
-            onChange={(_, val) => setFilter(val ?? "")}
-            size="small"
-          >
-            {STATUS_FILTERS.map((f) => (
-              <ToggleButton key={f.value} value={f.value}>{f.label}</ToggleButton>
-            ))}
-          </ToggleButtonGroup>
+        {/* Filter Chips */}
+        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mb: 3 }}>
+          {STATUS_FILTERS.map((f) => (
+            <Chip
+              key={f.value}
+              label={f.label}
+              onClick={() => setFilter(f.value)}
+              variant={filter === f.value ? "filled" : "outlined"}
+              color={filter === f.value ? "primary" : "default"}
+              sx={{
+                fontWeight: 600,
+                cursor: "pointer",
+                transition: "all 0.15s",
+                ...(filter !== f.value && {
+                  borderColor: theme.palette.divider,
+                  color: "text.secondary",
+                }),
+              }}
+            />
+          ))}
         </Box>
 
         <Card>
-          <CardContent>
+          <CardContent sx={{ p: 0 }}>
             {loading ? (
-              <Box textAlign="center" py={4}><CircularProgress /></Box>
+              <Box sx={{ textAlign: "center", py: 8 }}>
+                <CircularProgress sx={{ color: "primary.main" }} />
+              </Box>
             ) : (
-              <TableContainer component={Paper} variant="outlined">
+              <TableContainer>
                 <Table>
                   <TableHead>
-                    <TableRow sx={{ bgcolor: "#f8fafc" }}>
-                      <TableCell sx={{ fontWeight: 700 }}>No. Order</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Pelanggan</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>HP</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Paket</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Berat</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Total</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Tanggal</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Aksi</TableCell>
+                    <TableRow>
+                      {["No. Order", "Pelanggan", "No. HP", "Paket", "Berat", "Total", "Tanggal", "Status", "Aksi"].map((h) => (
+                        <TableCell
+                          key={h}
+                          sx={{
+                            fontWeight: 700,
+                            color: "text.secondary",
+                            fontSize: 12,
+                            letterSpacing: 0.5,
+                            bgcolor: isDark ? "rgba(255,255,255,0.03)" : "#f8fafc",
+                            borderBottom: `2px solid ${theme.palette.divider}`,
+                            py: 2,
+                            px: 2,
+                          }}
+                        >
+                          {h}
+                        </TableCell>
+                      ))}
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {orders.map((order) => {
                       const status = STATUS_CONFIG[order.status] || { label: order.status, color: "default" };
                       return (
-                        <TableRow key={order.id} hover>
-                          <TableCell sx={{ fontFamily: "monospace", fontSize: 12 }}>
+                        <TableRow
+                          key={order.id}
+                          hover
+                          sx={{
+                            "&:hover": {
+                              bgcolor: isDark ? "rgba(255,255,255,0.02)" : "rgba(79,70,229,0.02)",
+                            },
+                          }}
+                        >
+                          <TableCell sx={{ fontFamily: "monospace", fontSize: 11, color: "text.secondary", px: 2 }}>
                             {order.orderNumber}
                           </TableCell>
-                          <TableCell>{order.user.name}</TableCell>
-                          <TableCell>{order.user.phone || "-"}</TableCell>
-                          <TableCell>Paket {order.package.name}</TableCell>
-                          <TableCell>{order.weight} kg</TableCell>
-                          <TableCell>Rp {order.totalPrice.toLocaleString("id-ID")}</TableCell>
-                          <TableCell>
+                          <TableCell sx={{ fontWeight: 600, color: "text.primary", px: 2 }}>
+                            {order.user.name}
+                          </TableCell>
+                          <TableCell sx={{ color: "text.secondary", px: 2 }}>
+                            {order.user.phone || "-"}
+                          </TableCell>
+                          <TableCell sx={{ color: "text.secondary", px: 2 }}>
+                            Paket {order.package.name}
+                          </TableCell>
+                          <TableCell sx={{ color: order.weight ? "text.secondary" : "text.disabled", fontStyle: order.weight ? "normal" : "italic", px: 2 }}>
+                            {order.weight ? `${order.weight} kg` : "Belum ditimbang"}
+                          </TableCell>
+                          <TableCell sx={{ fontWeight: 600, px: 2 }}>
+                            {order.totalPrice ? (
+                              <Typography variant="body2" fontWeight={600} color="text.primary">
+                                Rp {order.totalPrice.toLocaleString("id-ID")}
+                              </Typography>
+                            ) : (
+                              <Typography variant="body2" color="text.disabled" fontStyle="italic">
+                                Menunggu...
+                              </Typography>
+                            )}
+                          </TableCell>
+                          <TableCell sx={{ color: "text.secondary", fontSize: 12, px: 2 }}>
                             {new Date(order.createdAt).toLocaleDateString("id-ID", {
-                              day: "numeric", month: "short", year: "numeric"
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
                             })}
                           </TableCell>
-                          <TableCell>
+                          <TableCell sx={{ px: 2 }}>
                             <Chip label={status.label} color={status.color} size="small" />
                           </TableCell>
-                          <TableCell>
+                          <TableCell sx={{ px: 2 }}>
                             <Button
                               size="small"
                               variant="contained"
                               onClick={() => router.push(`/admin/orders/${order.id}`)}
+                              sx={{
+                                background: "linear-gradient(135deg, #4f46e5, #0d9488)",
+                                fontSize: 12,
+                                py: 0.5,
+                                px: 1.5,
+                              }}
                             >
                               Kelola
                             </Button>
@@ -153,8 +212,8 @@ export default function AdminOrdersPage() {
                     })}
                     {orders.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={9} align="center" sx={{ color: "text.secondary", py: 4 }}>
-                          Tidak ada pesanan
+                        <TableCell colSpan={9} align="center" sx={{ py: 6, color: "text.disabled" }}>
+                          Tidak ada pesanan{filter ? " dengan status ini" : ""}
                         </TableCell>
                       </TableRow>
                     )}

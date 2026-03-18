@@ -5,10 +5,10 @@ import {
   Container,
   Typography,
   CircularProgress,
-  Alert,
-  ToggleButtonGroup,
-  ToggleButton,
+  Chip,
+  useTheme,
 } from "@mui/material";
+import { History, SearchOff } from "@mui/icons-material";
 import { useEffect, useState } from "react";
 import Navbar from "@/components/layout/Navbar";
 import OrderCard from "@/components/order/OrderCard";
@@ -27,13 +27,14 @@ interface Order {
   id: string;
   orderNumber: string;
   status: string;
-  weight: number;
-  totalPrice: number;
+  weight: number | null;
+  totalPrice: number | null;
   createdAt: string;
   package: { name: string; durationDays: number };
 }
 
 export default function HistoryPage() {
+  const theme = useTheme();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("");
@@ -54,42 +55,104 @@ export default function HistoryPage() {
   }, [filter]);
 
   return (
-    <Box sx={{ minHeight: "100vh", bgcolor: "#f8fafc" }}>
+    <Box sx={{ minHeight: "100vh", bgcolor: "background.default" }}>
       <Navbar />
-      <Container maxWidth="md" sx={{ py: 4 }}>
-        <Typography variant="h4" fontWeight={700} gutterBottom>
-          Riwayat Pesanan
-        </Typography>
-        <Typography color="text.secondary" mb={3}>
-          Semua pesanan laundry yang pernah Anda buat
-        </Typography>
 
-        {/* Filter */}
-        <Box sx={{ mb: 3, overflowX: "auto" }}>
-          <ToggleButtonGroup
-            value={filter}
-            exclusive
-            onChange={(_, val) => setFilter(val ?? "")}
-            size="small"
-          >
-            {STATUS_FILTERS.map((f) => (
-              <ToggleButton key={f.value} value={f.value}>
-                {f.label}
-              </ToggleButton>
-            ))}
-          </ToggleButtonGroup>
+      {/* Header */}
+      <Box
+        sx={{
+          background: "linear-gradient(135deg, #4f46e5 0%, #0d9488 100%)",
+          py: 4,
+          px: { xs: 2, md: 4 },
+        }}
+      >
+        <Container maxWidth="md">
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+            <Box
+              sx={{
+                p: 1,
+                borderRadius: 2,
+                bgcolor: "rgba(255,255,255,0.15)",
+                backdropFilter: "blur(4px)",
+              }}
+            >
+              <History sx={{ color: "white" }} />
+            </Box>
+            <Box>
+              <Typography variant="h5" fontWeight={800} color="white">
+                Riwayat Pesanan
+              </Typography>
+              <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.8)" }}>
+                Semua pesanan laundry yang pernah Anda buat
+              </Typography>
+            </Box>
+          </Box>
+        </Container>
+      </Box>
+
+      <Container maxWidth="md" sx={{ py: 4 }}>
+        {/* Filter Chips */}
+        <Box
+          sx={{
+            display: "flex",
+            gap: 1,
+            flexWrap: "wrap",
+            mb: 3,
+          }}
+        >
+          {STATUS_FILTERS.map((f) => (
+            <Chip
+              key={f.value}
+              label={f.label}
+              onClick={() => setFilter(f.value)}
+              variant={filter === f.value ? "filled" : "outlined"}
+              color={filter === f.value ? "primary" : "default"}
+              sx={{
+                fontWeight: 600,
+                cursor: "pointer",
+                transition: "all 0.15s",
+                ...(filter !== f.value && {
+                  borderColor: theme.palette.divider,
+                  color: "text.secondary",
+                }),
+              }}
+            />
+          ))}
         </Box>
 
+        {/* Results */}
         {loading ? (
-          <Box textAlign="center" py={4}>
-            <CircularProgress />
+          <Box sx={{ textAlign: "center", py: 8 }}>
+            <CircularProgress sx={{ color: "primary.main" }} />
           </Box>
         ) : orders.length === 0 ? (
-          <Alert severity="info">
-            Tidak ada pesanan{filter ? " dengan status ini" : ""}.
-          </Alert>
+          <Box
+            sx={{
+              textAlign: "center",
+              py: 8,
+              border: `2px dashed ${theme.palette.divider}`,
+              borderRadius: 3,
+            }}
+          >
+            <SearchOff sx={{ fontSize: 52, color: "text.disabled", mb: 2 }} />
+            <Typography variant="h6" fontWeight={600} color="text.secondary" gutterBottom>
+              Tidak ada pesanan
+            </Typography>
+            <Typography variant="body2" color="text.disabled">
+              {filter ? `Tidak ada pesanan dengan status "${STATUS_FILTERS.find(f => f.value === filter)?.label}"` : "Belum ada pesanan laundry"}
+            </Typography>
+          </Box>
         ) : (
-          orders.map((order) => <OrderCard key={order.id} order={order} />)
+          <Box>
+            <Typography variant="body2" color="text.secondary" mb={2}>
+              Menampilkan {orders.length} pesanan
+            </Typography>
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              {orders.map((order) => (
+                <OrderCard key={order.id} order={order} />
+              ))}
+            </Box>
+          </Box>
         )}
       </Container>
     </Box>

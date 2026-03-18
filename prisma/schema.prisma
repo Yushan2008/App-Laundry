@@ -37,8 +37,8 @@ model Order {
   orderNumber   String          @unique
   userId        String
   packageId     String
-  weight        Float
-  totalPrice    Int
+  weight        Float?          // diisi admin setelah ditimbang
+  totalPrice    Int?            // dihitung otomatis setelah admin input berat
   status        OrderStatus     @default(PENDING)
   notes         String?         @db.Text
   createdAt     DateTime        @default(now())

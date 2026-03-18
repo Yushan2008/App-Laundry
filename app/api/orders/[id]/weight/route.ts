@@ -2,16 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { OrderStatus } from "@prisma/client";
-
-const STATUS_ORDER: OrderStatus[] = [
-  "PENDING",
-  "PROCESSING",
-  "WASHING",
-  "DRYING",
-  "READY",
-  "DELIVERED",
-];
 
 export async function PATCH(
   req: NextRequest,
@@ -24,36 +14,37 @@ export async function PATCH(
 
   try {
     const { id } = await params;
-    const { status, description } = await req.json();
+    const { weight } = await req.json();
 
-    if (!STATUS_ORDER.includes(status)) {
-      return NextResponse.json({ error: "Status tidak valid" }, { status: 400 });
+    if (!weight || typeof weight !== "number" || weight <= 0) {
+      return NextResponse.json(
+        { error: "Berat harus diisi dan lebih dari 0 kg" },
+        { status: 400 }
+      );
     }
 
-    const order = await prisma.order.findUnique({ where: { id } });
+    const order = await prisma.order.findUnique({
+      where: { id },
+      include: { package: true },
+    });
+
     if (!order) {
       return NextResponse.json({ error: "Pesanan tidak ditemukan" }, { status: 404 });
     }
 
-    const updatedOrder = await prisma.order.update({
+    const totalPrice = Math.round(order.package.pricePerKg * weight);
+
+    const updated = await prisma.order.update({
       where: { id },
-      data: {
-        status,
-        statusHistory: {
-          create: {
-            status,
-            description: description || null,
-          },
-        },
-      },
+      data: { weight, totalPrice },
       include: {
-        package: true,
         user: { select: { id: true, name: true, email: true, phone: true, address: true } },
+        package: true,
         statusHistory: { orderBy: { createdAt: "asc" } },
       },
     });
 
-    return NextResponse.json({ order: updatedOrder });
+    return NextResponse.json({ order: updated });
   } catch {
     return NextResponse.json({ error: "Terjadi kesalahan" }, { status: 500 });
   }

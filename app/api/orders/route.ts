@@ -35,11 +35,11 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { packageId, weight, notes } = await req.json();
+    const { packageId, notes } = await req.json();
 
-    if (!packageId || !weight || weight <= 0) {
+    if (!packageId) {
       return NextResponse.json(
-        { error: "Package dan berat wajib diisi" },
+        { error: "Paket laundry wajib dipilih" },
         { status: 400 }
       );
     }
@@ -48,8 +48,6 @@ export async function POST(req: NextRequest) {
     if (!pkg) {
       return NextResponse.json({ error: "Paket tidak ditemukan" }, { status: 404 });
     }
-
-    const totalPrice = Math.round(pkg.pricePerKg * weight);
 
     // Generate nomor order unik: SL-YYYYMMDD-XXX
     const today = new Date();
@@ -71,8 +69,6 @@ export async function POST(req: NextRequest) {
         orderNumber,
         userId: session.user.id,
         packageId,
-        weight,
-        totalPrice,
         notes: notes || null,
         statusHistory: {
           create: {
