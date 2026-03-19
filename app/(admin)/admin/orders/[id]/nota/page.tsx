@@ -13,10 +13,12 @@ interface NotaOrder {
   status: string;
   weight: number | null;
   totalPrice: number | null;
+  deliveryFee: number | null;
   notes: string | null;
   createdAt: string;
   package: { name: string; pricePerKg: number; durationDays: number };
   user: { name: string; email: string; phone: string | null; address: string | null };
+  seller?: { name: string; phone: string | null; sellerProfile?: { businessName: string } | null } | null;
   statusHistory: { id: string; status: string; description: string | null; createdAt: string }[];
 }
 

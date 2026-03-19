@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { haversineDistance } from "@/lib/haversine";
+
+const ORDER_INCLUDE = {
+  user: { select: { id: true, name: true, email: true, phone: true, address: true } },
+  seller: { select: { id: true, name: true, phone: true, sellerProfile: { select: { businessName: true } } } },
+  package: true,
+  statusHistory: { orderBy: { createdAt: "desc" as const } },
+};
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -9,22 +17,68 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const status = searchParams.get("status");
+  const statusFilter = status ? { status: status as never } : {};
 
-  const where =
-    session.user.role === "ADMIN"
-      ? status ? { status: status as never } : {}
-      : { userId: session.user.id, ...(status ? { status: status as never } : {}) };
+  // === SELLER: own orders + nearby PENDING ===
+  if (session.user.role === "SELLER") {
+    const sellerProfile = await prisma.sellerProfile.findUnique({
+      where: { userId: session.user.id },
+    });
 
+    // Pesanan milik seller ini
+    const myOrders = await prisma.order.findMany({
+      where: { sellerId: session.user.id, ...statusFilter },
+      include: ORDER_INCLUDE,
+      orderBy: { createdAt: "desc" },
+    });
+
+    // PENDING orders di sekitar (radius ≤5km), belum diambil siapapun
+    let nearbyOrders: (typeof myOrders[0] & { distance?: number })[] = [];
+    if (sellerProfile) {
+      const pendingOrders = await prisma.order.findMany({
+        where: {
+          status: "PENDING",
+          sellerId: null,
+          customerLat: { not: null },
+          customerLng: { not: null },
+        },
+        include: ORDER_INCLUDE,
+        orderBy: { createdAt: "desc" },
+      });
+
+      nearbyOrders = pendingOrders
+        .map((o) => {
+          const dist = haversineDistance(
+            sellerProfile.latitude,
+            sellerProfile.longitude,
+            o.customerLat!,
+            o.customerLng!
+          );
+          return { ...o, distance: dist };
+        })
+        .filter((o) => o.distance <= 5)
+        .sort((a, b) => a.distance - b.distance);
+    }
+
+    return NextResponse.json({ orders: myOrders, nearbyOrders });
+  }
+
+  // === ADMIN: semua pesanan ===
+  if (session.user.role === "ADMIN") {
+    const orders = await prisma.order.findMany({
+      where: statusFilter,
+      include: ORDER_INCLUDE,
+      orderBy: { createdAt: "desc" },
+    });
+    return NextResponse.json({ orders });
+  }
+
+  // === CUSTOMER: pesanan sendiri ===
   const orders = await prisma.order.findMany({
-    where,
-    include: {
-      user: { select: { id: true, name: true, email: true, phone: true } },
-      package: true,
-      statusHistory: { orderBy: { createdAt: "desc" } },
-    },
+    where: { userId: session.user.id, ...statusFilter },
+    include: ORDER_INCLUDE,
     orderBy: { createdAt: "desc" },
   });
-
   return NextResponse.json({ orders });
 }
 
@@ -35,7 +89,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { packageId, notes } = await req.json();
+    const { packageId, notes, customerLat, customerLng } = await req.json();
 
     if (!packageId) {
       return NextResponse.json(
@@ -70,6 +124,8 @@ export async function POST(req: NextRequest) {
         userId: session.user.id,
         packageId,
         notes: notes || null,
+        customerLat: customerLat ? parseFloat(customerLat) : null,
+        customerLng: customerLng ? parseFloat(customerLng) : null,
         statusHistory: {
           create: {
             status: "PENDING",

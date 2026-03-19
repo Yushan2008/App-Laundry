@@ -25,21 +25,27 @@ const STATUS_CONFIG: Record<
   string,
   { label: string; color: "default" | "warning" | "info" | "primary" | "secondary" | "success" | "error" }
 > = {
-  PENDING: { label: "Menunggu", color: "warning" },
-  PROCESSING: { label: "Diproses", color: "info" },
-  WASHING: { label: "Dicuci", color: "primary" },
-  DRYING: { label: "Disetrika", color: "secondary" },
-  READY: { label: "Siap Diambil", color: "success" },
-  DELIVERED: { label: "Selesai", color: "default" },
+  PENDING:          { label: "Menunggu",          color: "warning" },
+  CONFIRMED:        { label: "Dikonfirmasi",       color: "secondary" },
+  PICKED_UP:        { label: "Dijemput",           color: "info" },
+  PROCESSING:       { label: "Diproses",           color: "info" },
+  WASHING:          { label: "Dicuci",             color: "primary" },
+  DRYING:           { label: "Disetrika",          color: "secondary" },
+  READY:            { label: "Siap Diantar",       color: "success" },
+  OUT_FOR_DELIVERY: { label: "Dalam Pengiriman",   color: "warning" },
+  DELIVERED:        { label: "Selesai",            color: "default" },
 };
 
 const STATUS_FILTERS = [
   { value: "", label: "Semua" },
   { value: "PENDING", label: "Menunggu" },
+  { value: "CONFIRMED", label: "Dikonfirmasi" },
+  { value: "PICKED_UP", label: "Dijemput" },
   { value: "PROCESSING", label: "Diproses" },
   { value: "WASHING", label: "Dicuci" },
   { value: "DRYING", label: "Disetrika" },
-  { value: "READY", label: "Siap Diambil" },
+  { value: "READY", label: "Siap Diantar" },
+  { value: "OUT_FOR_DELIVERY", label: "Dalam Pengiriman" },
   { value: "DELIVERED", label: "Selesai" },
 ];
 
@@ -49,9 +55,11 @@ interface Order {
   status: string;
   weight: number | null;
   totalPrice: number | null;
+  deliveryFee: number | null;
   createdAt: string;
   package: { name: string };
   user: { name: string; phone: string | null };
+  seller: { name: string; sellerProfile: { businessName: string } | null } | null;
 }
 
 export default function AdminOrdersPage() {
@@ -124,7 +132,7 @@ export default function AdminOrdersPage() {
                 <Table>
                   <TableHead>
                     <TableRow>
-                      {["No. Order", "Pelanggan", "No. HP", "Paket", "Berat", "Total", "Tanggal", "Status", "Aksi"].map((h) => (
+                      {["No. Order", "Pelanggan", "No. HP", "Paket", "Seller", "Berat", "Total", "Tanggal", "Status", "Aksi"].map((h) => (
                         <TableCell
                           key={h}
                           sx={{
@@ -167,6 +175,11 @@ export default function AdminOrdersPage() {
                           </TableCell>
                           <TableCell sx={{ color: "text.secondary", px: 2 }}>
                             Paket {order.package.name}
+                          </TableCell>
+                          <TableCell sx={{ color: order.seller ? "text.primary" : "text.disabled", fontStyle: order.seller ? "normal" : "italic", fontSize: 12, px: 2 }}>
+                            {order.seller
+                              ? (order.seller.sellerProfile?.businessName ?? order.seller.name)
+                              : "Belum di-assign"}
                           </TableCell>
                           <TableCell sx={{ color: order.weight ? "text.secondary" : "text.disabled", fontStyle: order.weight ? "normal" : "italic", px: 2 }}>
                             {order.weight ? `${order.weight} kg` : "Belum ditimbang"}
@@ -212,7 +225,7 @@ export default function AdminOrdersPage() {
                     })}
                     {orders.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={9} align="center" sx={{ py: 6, color: "text.disabled" }}>
+                        <TableCell colSpan={10} align="center" sx={{ py: 6, color: "text.disabled" }}>
                           Tidak ada pesanan{filter ? " dengan status ini" : ""}
                         </TableCell>
                       </TableRow>

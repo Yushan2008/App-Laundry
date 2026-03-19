@@ -14,6 +14,10 @@ import {
   LocalShipping,
   HourglassEmpty,
   Settings,
+  DirectionsBike,
+  TaskAlt,
+  ThumbUp,
+  Cancel,
 } from "@mui/icons-material";
 import { useThemeMode } from "@/app/context/ThemeContext";
 
@@ -21,18 +25,30 @@ const STATUS_STEPS = [
   {
     key: "PENDING",
     label: "Pesanan Diterima",
-    sublabel: "Pesanan sedang menunggu konfirmasi",
+    sublabel: "Menunggu seller terdekat mengambil pesanan",
     icon: <HourglassEmpty sx={{ fontSize: 16 }} />,
     color: "#f59e0b",
-    bgActive: "rgba(245,158,11,0.12)",
+  },
+  {
+    key: "CONFIRMED",
+    label: "Dikonfirmasi",
+    sublabel: "Seller telah mengambil pesanan, akan segera menjemput",
+    icon: <ThumbUp sx={{ fontSize: 16 }} />,
+    color: "#8b5cf6",
+  },
+  {
+    key: "PICKED_UP",
+    label: "Dijemput",
+    sublabel: "Seller sedang menjemput cucian Anda",
+    icon: <DirectionsBike sx={{ fontSize: 16 }} />,
+    color: "#3b82f6",
   },
   {
     key: "PROCESSING",
     label: "Sedang Diproses",
-    sublabel: "Cucian sedang dipersiapkan",
+    sublabel: "Seller menimbang cucian & menghitung harga akhir",
     icon: <Settings sx={{ fontSize: 16 }} />,
-    color: "#3b82f6",
-    bgActive: "rgba(59,130,246,0.12)",
+    color: "#06b6d4",
   },
   {
     key: "WASHING",
@@ -40,7 +56,6 @@ const STATUS_STEPS = [
     sublabel: "Cucian sedang dalam proses pencucian",
     icon: <LocalLaundryService sx={{ fontSize: 16 }} />,
     color: "#4f46e5",
-    bgActive: "rgba(79,70,229,0.12)",
   },
   {
     key: "DRYING",
@@ -48,23 +63,27 @@ const STATUS_STEPS = [
     sublabel: "Cucian sedang dikeringkan dan disetrika",
     icon: <Iron sx={{ fontSize: 16 }} />,
     color: "#0d9488",
-    bgActive: "rgba(13,148,136,0.12)",
   },
   {
     key: "READY",
-    label: "Siap Diambil",
-    sublabel: "Cucian sudah bersih dan siap diambil",
+    label: "Siap Diantar",
+    sublabel: "Cucian selesai, menunggu pengiriman",
     icon: <Inventory sx={{ fontSize: 16 }} />,
     color: "#10b981",
-    bgActive: "rgba(16,185,129,0.12)",
+  },
+  {
+    key: "OUT_FOR_DELIVERY",
+    label: "Dalam Pengiriman",
+    sublabel: "Seller sedang mengantarkan cucian",
+    icon: <LocalShipping sx={{ fontSize: 16 }} />,
+    color: "#f97316",
   },
   {
     key: "DELIVERED",
     label: "Selesai",
-    sublabel: "Cucian sudah diambil oleh pelanggan",
-    icon: <LocalShipping sx={{ fontSize: 16 }} />,
+    sublabel: "Cucian berhasil diantarkan",
+    icon: <TaskAlt sx={{ fontSize: 16 }} />,
     color: "#64748b",
-    bgActive: "rgba(100,116,139,0.12)",
   },
 ];
 
@@ -84,6 +103,75 @@ export default function StatusStepper({ currentStatus, statusHistory }: StatusSt
   const theme = useTheme();
   const { mode } = useThemeMode();
   const isDark = mode === "dark";
+
+  // Handle CANCELLED separately
+  if (currentStatus === "CANCELLED") {
+    const cancelHistory = statusHistory.find((h) => h.status === "CANCELLED");
+    return (
+      <Box>
+        {/* Show completed steps before cancellation */}
+        {STATUS_STEPS.filter((s) => s.key !== "DELIVERED").map((step) => {
+          const history = statusHistory.find((h) => h.status === step.key);
+          if (!history) return null;
+          return (
+            <Box key={step.key} sx={{ display: "flex", gap: 2, mb: 2 }}>
+              <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                <Box
+                  sx={{
+                    width: 36, height: 36, borderRadius: "50%", display: "flex",
+                    alignItems: "center", justifyContent: "center", flexShrink: 0,
+                    background: "linear-gradient(135deg, #4f46e5, #0d9488)",
+                    color: "white", boxShadow: "0 2px 12px rgba(79,70,229,0.3)",
+                  }}
+                >
+                  <CheckCircle sx={{ fontSize: 18, color: "white" }} />
+                </Box>
+              </Box>
+              <Box sx={{ flex: 1 }}>
+                <Typography variant="body2" fontWeight={600} color="text.primary">{step.label}</Typography>
+                {history.description && (
+                  <Typography variant="caption" color="text.secondary" display="block">{history.description}</Typography>
+                )}
+                <Typography variant="caption" color="text.disabled">
+                  {new Date(history.createdAt).toLocaleString("id-ID", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                </Typography>
+              </Box>
+            </Box>
+          );
+        })}
+        {/* Cancelled step */}
+        <Box sx={{ display: "flex", gap: 2 }}>
+          <Box
+            sx={{
+              width: 36, height: 36, borderRadius: "50%", display: "flex",
+              alignItems: "center", justifyContent: "center", flexShrink: 0,
+              background: "linear-gradient(135deg, #ef4444, #dc2626)",
+              color: "white", boxShadow: "0 2px 12px rgba(239,68,68,0.4)",
+            }}
+          >
+            <Cancel sx={{ fontSize: 18, color: "white" }} />
+          </Box>
+          <Box sx={{ flex: 1 }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
+              <Typography variant="body2" fontWeight={700} color="error.main">Pesanan Dibatalkan</Typography>
+              <Chip label="Dibatalkan" size="small" color="error" sx={{ height: 20, fontSize: 10, fontWeight: 700 }} />
+            </Box>
+            {cancelHistory?.description && (
+              <Typography variant="caption" color="text.secondary" display="block" sx={{ lineHeight: 1.5 }}>
+                {cancelHistory.description}
+              </Typography>
+            )}
+            {cancelHistory?.createdAt && (
+              <Typography variant="caption" sx={{ color: "#ef4444", fontWeight: 600 }}>
+                {new Date(cancelHistory.createdAt).toLocaleString("id-ID", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+              </Typography>
+            )}
+          </Box>
+        </Box>
+      </Box>
+    );
+  }
+
   const currentIndex = STATUS_STEPS.findIndex((s) => s.key === currentStatus);
 
   const getHistoryForStatus = (statusKey: string) =>

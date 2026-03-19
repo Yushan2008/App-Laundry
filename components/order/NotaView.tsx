@@ -29,20 +29,25 @@ interface NotaOrder {
   status: string;
   weight: number | null;
   totalPrice: number | null;
+  deliveryFee: number | null;
   notes: string | null;
   createdAt: string;
   package: { name: string; pricePerKg: number; durationDays: number };
   user: { name: string; email: string; phone: string | null; address: string | null };
+  seller?: { name: string; phone: string | null; sellerProfile?: { businessName: string } | null } | null;
   statusHistory: { id: string; status: string; description: string | null; createdAt: string }[];
 }
 
 const STATUS_CHIP: Record<string, { label: string; color: "default" | "warning" | "info" | "primary" | "secondary" | "success" }> = {
-  PENDING:    { label: "Menunggu",     color: "warning" },
-  PROCESSING: { label: "Diproses",     color: "info" },
-  WASHING:    { label: "Dicuci",       color: "primary" },
-  DRYING:     { label: "Disetrika",    color: "secondary" },
-  READY:      { label: "Siap Diambil", color: "success" },
-  DELIVERED:  { label: "Selesai",      color: "default" },
+  PENDING:          { label: "Menunggu",          color: "warning" },
+  CONFIRMED:        { label: "Dikonfirmasi",       color: "secondary" },
+  PICKED_UP:        { label: "Dijemput",           color: "info" },
+  PROCESSING:       { label: "Diproses",           color: "info" },
+  WASHING:          { label: "Dicuci",             color: "primary" },
+  DRYING:           { label: "Disetrika",          color: "secondary" },
+  READY:            { label: "Siap Diantar",       color: "success" },
+  OUT_FOR_DELIVERY: { label: "Dalam Pengiriman",   color: "warning" },
+  DELIVERED:        { label: "Selesai",            color: "default" },
 };
 
 function NRow({ icon, label, value, muted }: { icon: React.ReactNode; label: string; value: string; muted?: boolean }) {
@@ -307,29 +312,68 @@ export default function NotaView({ order }: { order: NotaOrder }) {
         )}
 
         {/* Total */}
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            mt: 2.5,
-            pt: 2.5,
-            borderTop: `2px solid ${theme.palette.divider}`,
-          }}
-        >
-          <Typography variant="body1" fontWeight={800} color="text.primary">
-            TOTAL HARGA
-          </Typography>
-          {order.totalPrice ? (
-            <Typography variant="h5" color="primary.main" fontWeight={800}>
-              Rp {order.totalPrice.toLocaleString("id-ID")}
-            </Typography>
-          ) : (
-            <Typography variant="body2" color="text.disabled" fontStyle="italic" fontWeight={600}>
-              Menunggu konfirmasi admin...
-            </Typography>
+        <Box sx={{ mt: 2.5, pt: 2.5, borderTop: `2px solid ${theme.palette.divider}` }}>
+          {order.totalPrice && (
+            <>
+              <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
+                <Typography variant="body2" color="text.secondary">Laundry</Typography>
+                <Typography variant="body2" fontWeight={600} color="text.primary">
+                  Rp {order.totalPrice.toLocaleString("id-ID")}
+                </Typography>
+              </Box>
+              <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1.5 }}>
+                <Typography variant="body2" color="text.secondary">Ongkir</Typography>
+                <Typography variant="body2" fontWeight={600} color="primary.main">
+                  {order.deliveryFee != null
+                    ? order.deliveryFee === 0 ? "Gratis" : `Rp ${order.deliveryFee.toLocaleString("id-ID")}`
+                    : "Menunggu seller..."}
+                </Typography>
+              </Box>
+            </>
           )}
+          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <Typography variant="body1" fontWeight={800} color="text.primary">
+              TOTAL HARGA
+            </Typography>
+            {order.totalPrice ? (
+              <Typography variant="h5" color="primary.main" fontWeight={800}>
+                Rp {(order.totalPrice + (order.deliveryFee ?? 0)).toLocaleString("id-ID")}
+              </Typography>
+            ) : (
+              <Typography variant="body2" color="text.disabled" fontStyle="italic" fontWeight={600}>
+                Menunggu konfirmasi admin...
+              </Typography>
+            )}
+          </Box>
         </Box>
+
+        {/* Seller Info (jika ada) */}
+        {order.seller && (
+          <>
+            <Divider sx={{ my: 2.5 }} />
+            <Typography variant="overline" color="text.secondary" fontWeight={700} letterSpacing={1.5}>
+              Informasi Seller
+            </Typography>
+            <Box
+              sx={{
+                mt: 1.5,
+                p: 2.5,
+                borderRadius: 2.5,
+                bgcolor: isDark ? "rgba(16,185,129,0.07)" : "rgba(16,185,129,0.04)",
+                border: `1px solid ${isDark ? "rgba(16,185,129,0.2)" : "rgba(16,185,129,0.15)"}`,
+              }}
+            >
+              <NRow
+                icon={<Person fontSize="small" />}
+                label="Nama Usaha"
+                value={order.seller.sellerProfile?.businessName ?? order.seller.name}
+              />
+              {order.seller.phone && (
+                <NRow icon={<Phone fontSize="small" />} label="No. HP Seller" value={order.seller.phone} />
+              )}
+            </Box>
+          </>
+        )}
 
         <Divider sx={{ my: 3.5 }} />
 

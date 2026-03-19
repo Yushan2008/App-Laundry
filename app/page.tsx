@@ -523,21 +523,43 @@ export default function LandingPage() {
           <Typography variant="body1" sx={{ color: "rgba(255,255,255,0.85)", mb: 4 }}>
             Daftar gratis sekarang dan nikmati kemudahan laundry anak kost
           </Typography>
-          <Button
-            variant="contained"
-            size="large"
-            onClick={() => router.push("/register")}
-            sx={{
-              bgcolor: "white",
-              color: "#4f46e5",
-              fontWeight: 700,
-              px: 5,
-              py: 1.5,
-              "&:hover": { bgcolor: "#f1f5f9" },
-            }}
-          >
-            Daftar Sekarang — Gratis!
-          </Button>
+          <Box sx={{ display: "flex", gap: 2, justifyContent: "center", flexWrap: "wrap" }}>
+            <Button
+              variant="contained"
+              size="large"
+              onClick={() => router.push("/register")}
+              sx={{
+                bgcolor: "white",
+                color: "#4f46e5",
+                fontWeight: 700,
+                px: 5,
+                py: 1.5,
+                "&:hover": { bgcolor: "#f1f5f9" },
+              }}
+            >
+              Daftar sebagai Pelanggan
+            </Button>
+            <Button
+              variant="outlined"
+              size="large"
+              onClick={() => router.push("/register/seller")}
+              sx={{
+                borderColor: "rgba(255,255,255,0.6)",
+                borderWidth: 2,
+                color: "white",
+                fontWeight: 700,
+                px: 4,
+                py: 1.5,
+                "&:hover": {
+                  borderColor: "white",
+                  borderWidth: 2,
+                  bgcolor: "rgba(255,255,255,0.1)",
+                },
+              }}
+            >
+              Daftar sebagai Seller
+            </Button>
+          </Box>
         </Container>
       </Box>
 

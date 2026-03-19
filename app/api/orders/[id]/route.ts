@@ -17,6 +17,7 @@ export async function GET(
       where: { id },
       include: {
         user: { select: { id: true, name: true, email: true, phone: true, address: true } },
+        seller: { select: { id: true, name: true, phone: true, sellerProfile: { select: { businessName: true } } } },
         package: true,
         statusHistory: { orderBy: { createdAt: "asc" } },
       },
@@ -26,6 +27,14 @@ export async function GET(
 
     // Customer hanya bisa lihat pesanannya sendiri
     if (session.user.role === "CUSTOMER" && order.userId !== session.user.id) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    // Seller bisa lihat: pesanannya sendiri ATAU pesanan PENDING (belum diambil)
+    if (
+      session.user.role === "SELLER" &&
+      order.sellerId !== session.user.id &&
+      order.status !== "PENDING"
+    ) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

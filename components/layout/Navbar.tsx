@@ -27,6 +27,7 @@ import { useSession, signOut } from "next-auth/react";
 import { useRouter, usePathname } from "next/navigation";
 import { useState } from "react";
 import { useThemeMode } from "@/app/context/ThemeContext";
+import NotificationBell from "@/components/notifications/NotificationBell";
 
 const navLinks = [
   { label: "Dashboard", icon: <Dashboard fontSize="small" />, path: "/dashboard" },
@@ -114,6 +115,9 @@ export default function Navbar() {
         )}
 
         <Box sx={{ flexGrow: 1 }} />
+
+        {/* Notification Bell */}
+        {session && <NotificationBell />}
 
         {/* Dark Mode Toggle */}
         <IconButton

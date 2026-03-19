@@ -26,6 +26,12 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Navbar from "@/components/layout/Navbar";
 import { useThemeMode } from "@/app/context/ThemeContext";
+import dynamic from "next/dynamic";
+
+const LocationPicker = dynamic(
+  () => import("@/components/map/LocationPicker"),
+  { ssr: false, loading: () => <Box sx={{ height: 300, display: "flex", alignItems: "center", justifyContent: "center" }}><CircularProgress /></Box> }
+);
 
 interface Package {
   id: string;
@@ -42,6 +48,9 @@ export default function NewOrderPage() {
   const [packages, setPackages] = useState<Package[]>([]);
   const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
   const [notes, setNotes] = useState("");
+  const [estimatedWeight, setEstimatedWeight] = useState("");
+  const [customerLat, setCustomerLat] = useState<number | null>(null);
+  const [customerLng, setCustomerLng] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
@@ -81,7 +90,12 @@ export default function NewOrderPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         packageId: selectedPackage.id,
-        notes,
+        notes: [
+          estimatedWeight ? `Estimasi berat: ${estimatedWeight} kg` : "",
+          notes,
+        ].filter(Boolean).join(" | ") || null,
+        customerLat,
+        customerLng,
       }),
     });
 
@@ -288,25 +302,96 @@ export default function NewOrderPage() {
                 </CardContent>
               </Card>
 
-              {/* Step 2 — Catatan */}
+              {/* Step 2 — Estimasi Berat */}
+              <Card sx={{ mb: 3 }}>
+                <CardContent sx={{ p: 3 }}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+                    <Box
+                      sx={{
+                        width: 28, height: 28, borderRadius: "50%",
+                        bgcolor: isDark ? "rgba(255,255,255,0.1)" : "#f1f5f9",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        color: "text.secondary", fontSize: 13, fontWeight: 700,
+                      }}
+                    >
+                      2
+                    </Box>
+                    <Typography variant="h6" fontWeight={700} color="text.primary">
+                      Estimasi Berat{" "}
+                      <Typography component="span" variant="body2" color="text.secondary">
+                        (opsional)
+                      </Typography>
+                    </Typography>
+                  </Box>
+                  <Typography variant="caption" color="text.secondary" display="block" mb={2}>
+                    Perkiraan berat cucian Anda. Admin akan menimbang ulang untuk menentukan harga akhir.
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    label="Estimasi berat (kg)"
+                    type="number"
+                    value={estimatedWeight}
+                    onChange={(e) => setEstimatedWeight(e.target.value)}
+                    inputProps={{ min: 0.5, step: 0.5 }}
+                    placeholder="Contoh: 3"
+                    size="small"
+                    helperText={
+                      estimatedWeight && selectedPackage
+                        ? `Estimasi biaya: Rp ${Math.round(selectedPackage.pricePerKg * parseFloat(estimatedWeight)).toLocaleString("id-ID")} (belum final)`
+                        : "Masukkan perkiraan berat cucian Anda"
+                    }
+                  />
+                </CardContent>
+              </Card>
+
+              {/* Step 3 — Pin Lokasi */}
+              <Card sx={{ mb: 3 }}>
+                <CardContent sx={{ p: 3 }}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+                    <Box
+                      sx={{
+                        width: 28, height: 28, borderRadius: "50%",
+                        bgcolor: isDark ? "rgba(255,255,255,0.1)" : "#f1f5f9",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        color: "text.secondary", fontSize: 13, fontWeight: 700,
+                      }}
+                    >
+                      3
+                    </Box>
+                    <Typography variant="h6" fontWeight={700} color="text.primary">
+                      Pin Lokasi Penjemputan{" "}
+                      <Typography component="span" variant="body2" color="text.secondary">
+                        (opsional)
+                      </Typography>
+                    </Typography>
+                  </Box>
+                  <Typography variant="caption" color="text.secondary" display="block" mb={2}>
+                    Tentukan lokasi agar seller dapat menemukan Anda lebih mudah. Jika tidak diisi, seller akan menggunakan alamat profil Anda.
+                  </Typography>
+                  <LocationPicker
+                    onLocationChange={(lat, lng) => { setCustomerLat(lat); setCustomerLng(lng); }}
+                  />
+                  {customerLat && (
+                    <Typography variant="caption" color="success.main" display="block" mt={1}>
+                      ✅ Koordinat: {customerLat.toFixed(5)}, {customerLng?.toFixed(5)}
+                    </Typography>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Step 4 — Catatan */}
               <Card>
                 <CardContent sx={{ p: 3 }}>
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 3 }}>
                     <Box
                       sx={{
-                        width: 28,
-                        height: 28,
-                        borderRadius: "50%",
+                        width: 28, height: 28, borderRadius: "50%",
                         bgcolor: isDark ? "rgba(255,255,255,0.1)" : "#f1f5f9",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        color: "text.secondary",
-                        fontSize: 13,
-                        fontWeight: 700,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        color: "text.secondary", fontSize: 13, fontWeight: 700,
                       }}
                     >
-                      2
+                      4
                     </Box>
                     <Typography variant="h6" fontWeight={700} color="text.primary">
                       Catatan{" "}

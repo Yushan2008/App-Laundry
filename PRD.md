@@ -1,344 +1,568 @@
 # Product Requirement Document (PRD)
 ## Signature Laundry — Aplikasi Laundry untuk Anak Kost
 
+**Versi**: 3.0 | **Tanggal**: Maret 2026 | **Status**: In Development
+
+> **⚠️ Catatan QA untuk Developer:**
+> Pastikan semua fitur dan sistem berjalan dengan sangat baik. Uji coba sebelum konfirmasi selesai.
+> Jika ada kesalahan/bug, langsung diperbaiki agar sistemnya berjalan normal.
+
+---
+
+## Daftar Isi
+1. [Ringkasan Produk](#1-ringkasan-produk)
+2. [Target Pengguna](#2-target-pengguna)
+3. [Tech Stack](#3-tech-stack)
+4. [Hierarki Role](#4-hierarki-role)
+5. [Fitur per Role](#5-fitur-per-role)
+6. [Alur Status Pesanan](#6-alur-status-pesanan)
+7. [Database Schema](#7-database-schema)
+8. [Struktur Halaman & Routes](#8-struktur-halaman--routes)
+9. [API Endpoints](#9-api-endpoints)
+10. [Struktur Folder Proyek](#10-struktur-folder-proyek)
+11. [Non-Functional Requirements](#11-non-functional-requirements)
+12. [Rencana Implementasi & Status](#12-rencana-implementasi--status)
+13. [Log Bug & Perbaikan](#13-log-bug--perbaikan)
+
 ---
 
 ## 1. Ringkasan Produk
 
-| | |
-|---|---|
-| **Nama Produk** | Signature Laundry |
-| **Versi** | 1.0.0 |
-| **Tanggal** | Maret 2026 |
-| **Status** | Draft |
+**Nama Produk**: Signature Laundry
+**Visi**: *"Pakaian bersih tanpa repot, cukup dari genggaman tangan."*
 
-### 1.1 Latar Belakang
-Anak kost seringkali kesulitan dalam mengurus cucian karena keterbatasan waktu, alat, dan tempat. Layanan laundry kiloan menjadi solusi populer, namun prosesnya masih manual — pelanggan harus datang langsung, tidak tahu estimasi selesai, dan tidak bisa memantau status cuciannya. **Signature Laundry** hadir untuk mendigitalisasi pengalaman ini.
-
-### 1.2 Tujuan Produk
-- Memudahkan anak kost dalam memesan layanan laundry secara digital
-- Memberikan transparansi status pesanan secara real-time
-- Membantu admin laundry mengelola pesanan dengan lebih efisien
-
-### 1.3 Visi
-> *"Pakaian bersih tanpa repot, cukup dari genggaman tangan."*
+Signature Laundry adalah platform digital laundry berbasis web yang menghubungkan **pelanggan** (anak kost/mahasiswa), **seller** (penyedia jasa laundry sekaligus antar-jemput), dan **admin** (pengelola sistem) dalam satu ekosistem. Pelanggan memesan secara online, seller **secara mandiri mengambil pesanan** dalam radius 5km, mengelola seluruh proses laundry, dan mengantarkan kembali. Admin berperan sebagai **pengawas** dengan akses cancel/re-assign darurat.
 
 ---
 
 ## 2. Target Pengguna
 
-### 2.1 Pelanggan (Anak Kost / Customer)
-| Atribut | Detail |
-|---------|--------|
-| Demografi | Mahasiswa/pekerja muda, usia 18–30 tahun |
-| Lokasi | Tinggal di kos-kosan dekat area laundry |
-| Kebutuhan | Pesan laundry mudah, tahu kapan selesai, lihat riwayat |
-| Pain Point | Harus datang langsung, tidak tahu estimasi, sering lupa ambil |
-
-**User Journey Pelanggan:**
-1. Daftar akun / Login
-2. Pilih paket laundry (Reguler / Express)
-3. Input berat cucian → lihat kalkulasi harga
-4. Submit pesanan
-5. Pantau status pesanan secara real-time
-6. Lihat riwayat pesanan sebelumnya
-
-### 2.2 Admin Laundry
-| Atribut | Detail |
-|---------|--------|
-| Demografi | Pemilik/karyawan usaha laundry |
-| Kebutuhan | Kelola pesanan, update status, pantau semua transaksi |
-| Pain Point | Catat pesanan manual, sulit track status banyak pelanggan |
-
-**User Journey Admin:**
-1. Login sebagai admin
-2. Lihat dashboard (statistik harian)
-3. Kelola daftar pesanan yang masuk
-4. Update status pesanan sesuai progress
-5. Lihat data pelanggan
+| Role | Demografi | Kebutuhan Utama |
+|------|-----------|-----------------|
+| **Customer** | Mahasiswa/pekerja muda, 18–30 tahun, tinggal di kos | Pesan mudah, lacak status, lihat bukti pesanan |
+| **Admin** | Pemilik/karyawan laundry | Pantau semua pesanan, approve seller, cancel/reassign darurat |
+| **Seller** | Mitra jasa laundry + antar-jemput | Pilih pesanan terdekat, kelola laundry mandiri, konfirmasi berat |
 
 ---
 
 ## 3. Tech Stack
 
-| Komponen | Teknologi | Alasan |
-|----------|-----------|--------|
-| Framework | Next.js 14 (App Router) | Fullstack, SSR, file-based routing |
-| Bahasa | TypeScript | Type safety, lebih mudah maintain |
-| UI Framework | Material UI (MUI) v5 | Komponen siap pakai, Material Design |
-| Database | MySQL | Relasional, cocok untuk data pesanan |
-| ORM | Prisma | Type-safe database queries |
-| Autentikasi | NextAuth.js v4 | Session management, JWT, role |
-| Hashing Password | bcryptjs | Keamanan password |
-| Deployment | Vercel + Railway (MySQL) | Free tier, mudah deploy |
+| Komponen | Teknologi | Keterangan |
+|----------|-----------|------------|
+| Framework | Next.js 16 (App Router) | Full-stack, Turbopack |
+| Bahasa | TypeScript | Seluruh codebase |
+| UI | Material UI (MUI) v5 | Komponen + dark/light mode |
+| Database | MariaDB 10.4 (via XAMPP) | Local development |
+| ORM | Prisma v6 | Schema-first, type-safe |
+| Auth | NextAuth.js v4 | JWT strategy, Credentials provider |
+| Password | bcryptjs | Hash + verify |
+| Real-time | Socket.io | GPS tracking seller ke customer |
+| Peta | Leaflet.js + OpenStreetMap | Gratis, no API key |
+| Jarak | Haversine Formula | Kalkulasi jarak seller ke customer |
 
 ---
 
-## 4. Fitur Utama
+## 4. Hierarki Role
 
-### 4.1 Autentikasi (Auth)
-- [x] Registrasi akun baru (nama, email, password, nomor HP, alamat kos)
-- [x] Login dengan email & password
-- [x] Sistem role: `CUSTOMER` dan `ADMIN`
-- [x] Proteksi route berdasarkan role (Next.js Middleware)
-- [x] Logout
-
-### 4.2 Paket Laundry
-| Paket | Harga | Estimasi | Keterangan |
-|-------|-------|----------|------------|
-| Reguler | Rp 5.000/kg | 3 hari | Cuci + setrika standar |
-| Express | Rp 10.000/kg | 1 hari | Cuci + setrika prioritas, antrian diprioritaskan |
-
-### 4.3 Pemesanan (Order)
-- [x] Form pemesanan: pilih paket, input berat (kg), catatan tambahan
-- [x] Kalkulator harga otomatis: `berat (kg) × harga per kg`
-- [x] Konfirmasi pesanan sebelum submit
-- [x] Nomor order unik otomatis (format: `SL-YYYYMMDD-XXX`)
-- [x] Estimasi selesai ditampilkan berdasarkan paket yang dipilih
-
-### 4.4 Tracking Status Pesanan
-Alur status pesanan:
 ```
-PENDING → PROCESSING → WASHING → DRYING → READY → DELIVERED
-```
+ADMIN
+  └── Approve/reject pendaftaran seller
+  └── Pantau semua pesanan (view-only untuk pesanan yang ada seller)
+  └── Cancel pesanan darurat (alasan wajib >= 5 karakter)
+  └── Re-assign seller (alasan wajib, pilih seller atau kembalikan ke antrian)
 
-| Status | Keterangan | Yang Dilakukan |
-|--------|------------|----------------|
-| PENDING | Pesanan diterima | Menunggu konfirmasi admin |
-| PROCESSING | Dikonfirmasi admin | Pakaian sedang ditimbang & dicatat |
-| WASHING | Sedang dicuci | Proses pencucian |
-| DRYING | Sedang dikeringkan | Proses pengeringan & setrika |
-| READY | Siap diambil | Pelanggan bisa ambil cucian |
-| DELIVERED | Selesai | Cucian sudah diambil pelanggan |
+SELLER
+  └── Lihat pesanan PENDING dalam radius 5km
+  └── Ambil pesanan secara mandiri (self-assign)
+  └── Kelola SELURUH siklus pesanan: jemput -> cuci -> antar -> selesai
+  └── Konfirmasi berat + upload bukti foto timbangan (wajib)
+  └── Berbagi lokasi GPS real-time saat jemput/antar
 
-- Timeline visual (stepper) di halaman detail pesanan
-- Setiap perubahan status dicatat dengan timestamp
-- Pelanggan dapat melihat riwayat perubahan status
-
-### 4.5 Riwayat Pesanan
-- [x] Daftar semua pesanan dengan status & tanggal
-- [x] Filter berdasarkan status
-- [x] Detail pesanan: paket, berat, total harga, timeline status
-
-### 4.6 Dashboard Admin
-- [x] Statistik: total pesanan hari ini, total pendapatan, pesanan aktif
-- [x] Daftar semua pesanan dengan filter status
-- [x] Update status pesanan + tambah catatan opsional
-- [x] Daftar data pelanggan terdaftar
-
----
-
-## 5. Struktur Halaman (Sitemap)
-
-### Halaman Publik
-```
-/               → Landing Page
-/login          → Halaman Login
-/register       → Halaman Registrasi
-```
-
-### Halaman Pelanggan (require auth: CUSTOMER)
-```
-/dashboard              → Ringkasan pesanan aktif
-/order/new              → Form buat pesanan baru
-/order/[id]             → Detail & tracking pesanan
-/history                → Riwayat semua pesanan
-```
-
-### Halaman Admin (require auth: ADMIN)
-```
-/admin                  → Dashboard admin
-/admin/orders           → Daftar semua pesanan
-/admin/orders/[id]      → Detail pesanan + update status
-/admin/users            → Daftar pelanggan
+CUSTOMER
+  └── Buat pesanan & pin lokasi
+  └── Lacak seller secara real-time
+  └── Lihat harga setelah seller konfirmasi berat
+  └── Lihat riwayat & nota
 ```
 
 ---
 
-## 6. Desain Database
+## 5. Fitur per Role
 
-### Entity Relationship
+### 5.1 Customer
 
-```
-User (1) ─────── (N) Order
-Package (1) ──── (N) Order
-Order (1) ─────── (N) StatusHistory
-```
+| # | Fitur | Deskripsi |
+|---|-------|-----------|
+| C1 | Registrasi | Daftar akun: nama, email, password, HP, alamat |
+| C2 | Login/Logout | Dengan email & password |
+| C3 | Buat Pesanan | Pilih paket, estimasi berat (opsional), pin lokasi di peta |
+| C4 | Tracking Status | Timeline visual 10 tahap (termasuk CANCELLED) |
+| C5 | Lacak Seller | Peta real-time saat seller menuju/menjemput |
+| C6 | Lihat Nota | Bukti pesanan: info pelanggan, paket, harga, timeline |
+| C7 | Riwayat Pesanan | Semua pesanan + filter status |
+| C8 | Dashboard | Pesanan aktif + shortcut buat pesanan |
+| C9 | Konfirmasi Harga | Harga ditampilkan hanya setelah seller konfirmasi berat aktual |
 
-### Skema Tabel
+### 5.2 Seller
 
-#### Tabel `users`
-| Kolom | Tipe | Keterangan |
-|-------|------|------------|
-| id | CUID | Primary key |
-| name | VARCHAR | Nama lengkap |
-| email | VARCHAR | Email unik |
-| password | VARCHAR | Password ter-hash |
-| role | ENUM | CUSTOMER / ADMIN |
-| phone | VARCHAR | Nomor HP (opsional) |
-| address | TEXT | Alamat kos (opsional) |
-| createdAt | DATETIME | Waktu registrasi |
+| # | Fitur | Deskripsi |
+|---|-------|-----------|
+| S1 | Registrasi Seller | Halaman khusus: nama usaha, foto, alamat, jam, area layanan |
+| S2 | Approval Admin | Akun seller aktif setelah disetujui admin |
+| S3 | Dashboard Seller | Statistik & pesanan aktif |
+| S4 | Lihat Pesanan Terdekat | Tab "Tersedia" — pesanan PENDING dalam radius 5km, diurutkan terdekat |
+| S5 | Self-Assign Pesanan | Klik "Ambil Pesanan" -> status CONFIRMED, order jadi milik seller |
+| S6 | Mulai Jemput | Status -> PICKED_UP, GPS aktif, customer bisa lacak di peta |
+| S7 | Konfirmasi Berat + Foto | Upload foto timbangan (wajib) + input berat -> status PROCESSING + harga dihitung |
+| S8 | Proses Laundry | Update status: WASHING -> DRYING -> READY secara mandiri |
+| S9 | Mulai Antar | Status -> OUT_FOR_DELIVERY, GPS aktif |
+| S10 | Konfirmasi Selesai | Status -> DELIVERED |
+| S11 | Kelola Profil | Edit data usaha, jam operasional, foto, toggle ketersediaan |
 
-#### Tabel `packages`
-| Kolom | Tipe | Keterangan |
-|-------|------|------------|
-| id | CUID | Primary key |
-| name | VARCHAR | Reguler / Express |
-| pricePerKg | INT | Harga per kg (Rupiah) |
-| durationDays | INT | Estimasi hari selesai |
-| description | TEXT | Deskripsi paket |
+### 5.3 Admin
 
-#### Tabel `orders`
-| Kolom | Tipe | Keterangan |
-|-------|------|------------|
-| id | CUID | Primary key |
-| orderNumber | VARCHAR | Nomor unik (SL-YYYYMMDD-XXX) |
-| userId | CUID | FK → users |
-| packageId | CUID | FK → packages |
-| weight | FLOAT | Berat cucian (kg) |
-| totalPrice | INT | Total harga (Rupiah) |
-| status | ENUM | Status pesanan |
-| notes | TEXT | Catatan pelanggan |
-| createdAt | DATETIME | Waktu pesan |
-| updatedAt | DATETIME | Waktu update terakhir |
-
-#### Tabel `status_histories`
-| Kolom | Tipe | Keterangan |
-|-------|------|------------|
-| id | CUID | Primary key |
-| orderId | CUID | FK → orders |
-| status | ENUM | Status baru |
-| description | TEXT | Catatan admin (opsional) |
-| createdAt | DATETIME | Waktu perubahan |
+| # | Fitur | Deskripsi |
+|---|-------|-----------|
+| A1 | Dashboard | Statistik: pesanan hari ini, pendapatan, pesanan aktif |
+| A2 | Kelola Pesanan | List semua pesanan + filter status (view-only untuk pesanan ber-seller) |
+| A3 | Detail Pesanan | Lihat semua info: pelanggan, seller, berat, foto bukti, timeline |
+| A4 | Cancel Pesanan | Tindakan darurat: alasan wajib >= 5 karakter, notifikasi ke seller & pelanggan |
+| A5 | Re-assign Seller | Pindah ke seller lain / kembalikan ke antrian PENDING, alasan wajib |
+| A6 | Lihat Nota | Cetak/lihat bukti pesanan dengan detail lengkap |
+| A7 | Kelola Seller | List semua seller + approve/reject + lihat profil |
+| A8 | Kelola Pelanggan | Daftar semua customer |
+| A9 | Notifikasi | Terima notif saat ada pendaftaran seller baru |
 
 ---
 
-## 7. API Endpoints
+## 6. Alur Status Pesanan (10 Status)
 
-| Method | Endpoint | Deskripsi | Akses |
-|--------|----------|-----------|-------|
-| POST | `/api/register` | Daftar akun baru | Public |
-| GET | `/api/packages` | Ambil daftar paket | Public |
-| GET | `/api/orders` | Daftar pesanan user | Customer / Admin |
-| POST | `/api/orders` | Buat pesanan baru | Customer |
-| GET | `/api/orders/[id]` | Detail pesanan | Customer / Admin |
-| PATCH | `/api/orders/[id]/status` | Update status pesanan | Admin |
+```
+PENDING -> CONFIRMED -> PICKED_UP -> PROCESSING -> WASHING -> DRYING -> READY -> OUT_FOR_DELIVERY -> DELIVERED
+                                                                                        |
+                                                                              (admin darurat kapan saja)
+                                                                                        v
+                                                                                   CANCELLED
+```
+
+| Status | Diubah Oleh | Keterangan |
+|--------|-------------|------------|
+| `PENDING` | System | Customer buat pesanan, menunggu seller ambil |
+| `CONFIRMED` | **Seller** | Seller self-assign pesanan (ambil dari tab Tersedia) |
+| `PICKED_UP` | **Seller** | Seller klik "Sudah Jemput", GPS aktif, customer bisa lacak |
+| `PROCESSING` | **Seller** | Seller upload foto timbangan + input berat -> harga dihitung otomatis |
+| `WASHING` | **Seller** | Cucian sedang dicuci |
+| `DRYING` | **Seller** | Cucian sedang dikeringkan & disetrika |
+| `READY` | **Seller** | Cucian siap diantar |
+| `OUT_FOR_DELIVERY` | **Seller** | Seller klik "Mulai Antar", GPS aktif |
+| `DELIVERED` | **Seller** | Seller klik "Sudah Diantar", pesanan selesai |
+| `CANCELLED` | **Admin** | Pembatalan darurat dengan alasan wajib (>= 5 karakter) |
+
+**Catatan Penting:**
+- **Seller mengelola SEMUA status** dari CONFIRMED sampai DELIVERED
+- **Admin hanya bisa view** pesanan yang sedang dikelola seller
+- **Admin bisa Cancel atau Re-assign** kapan saja sebagai tindakan darurat
+- **PROCESSING** hanya bisa diset melalui endpoint `/weight` (bukan `/status`), membutuhkan berat + foto bukti
+
+**Catatan GPS:**
+Seller berbagi lokasi saat PICKED_UP dan OUT_FOR_DELIVERY. Customer dapat melacak posisi seller di peta Leaflet via Socket.io.
+
+**Catatan Delivery Fee:**
+- Paket **Reguler**: `Rp 1.000 x ceil(jarak km)`
+- Paket **Express**: **Gratis**
+
+**Catatan Harga untuk Customer:**
+- Customer memberikan estimasi berat saat memesan (opsional, untuk referensi seller)
+- Harga final hanya ditampilkan setelah seller konfirmasi berat aktual + upload foto bukti
+- Sebelum konfirmasi berat: customer melihat "Menunggu konfirmasi berat dari seller"
 
 ---
 
-## 8. Struktur Folder Proyek
+## 7. Database Schema
+
+### Schema Saat Ini (Aktif)
+
+```prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String         @id @default(cuid())
+  name           String
+  email          String         @unique
+  password       String
+  role           Role           @default(CUSTOMER)
+  phone          String?
+  address        String?
+  createdAt      DateTime       @default(now())
+  orders         Order[]
+  sellerProfile  SellerProfile?
+  notifications  Notification[]
+  sellerOrders   Order[]        @relation("SellerOrders")
+
+  @@map("users")
+}
+
+model Package {
+  id           String  @id @default(cuid())
+  name         String
+  pricePerKg   Int
+  durationDays Int
+  description  String? @db.Text
+  orders       Order[]
+
+  @@map("packages")
+}
+
+model Order {
+  id             String          @id @default(cuid())
+  orderNumber    String          @unique
+  userId         String
+  packageId      String
+  sellerId       String?
+  weight         Float?
+  weightProofUrl String?         // URL foto bukti timbangan (wajib saat konfirmasi berat)
+  totalPrice     Int?
+  deliveryFee    Int?
+  customerLat    Float?
+  customerLng    Float?
+  status         OrderStatus     @default(PENDING)
+  notes          String?         @db.Text
+  cancelReason   String?         @db.Text
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  user           User            @relation(fields: [userId], references: [id])
+  package        Package         @relation(fields: [packageId], references: [id])
+  seller         User?           @relation("SellerOrders", fields: [sellerId], references: [id])
+  statusHistory  StatusHistory[]
+
+  @@map("orders")
+}
+
+model StatusHistory {
+  id          String      @id @default(cuid())
+  orderId     String
+  status      OrderStatus
+  description String?     @db.Text
+  createdAt   DateTime    @default(now())
+  order       Order       @relation(fields: [orderId], references: [id])
+
+  @@map("status_histories")
+}
+
+model SellerProfile {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  businessName   String
+  photoUrl       String?
+  address        String
+  latitude       Float
+  longitude      Float
+  operatingHours String
+  serviceArea    String
+  isApproved     Boolean  @default(false)
+  isAvailable    Boolean  @default(true)
+  currentLat     Float?
+  currentLng     Float?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  user           User     @relation(fields: [userId], references: [id])
+
+  @@map("seller_profiles")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  type      String
+  isRead    Boolean  @default(false)
+  orderId   String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@map("notifications")
+}
+
+enum Role {
+  CUSTOMER
+  ADMIN
+  SELLER
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PICKED_UP
+  PROCESSING
+  WASHING
+  DRYING
+  READY
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+}
+```
+
+> **Catatan migrasi:** Jalankan `npx prisma db push` setiap kali schema berubah (XAMPP harus aktif).
+> Fields `weightProofUrl`, `cancelReason`, dan enum `CANCELLED` memerlukan `prisma db push`.
+
+---
+
+## 8. Struktur Halaman & Routes
+
+### Customer
+
+| Route | Halaman | Status |
+|-------|---------|--------|
+| `/` | Landing Page — CTA daftar Pelanggan atau Seller | ✅ Selesai |
+| `/login` | Login (redirect ke `/seller`, `/admin`, atau `/dashboard`) | ✅ Selesai |
+| `/register` | Registrasi customer + tombol Daftar sebagai Seller | ✅ Selesai |
+| `/dashboard` | Dashboard pesanan aktif | ✅ Selesai |
+| `/order/new` | Buat pesanan (pilih paket + estimasi berat + pin lokasi) | ✅ Selesai |
+| `/order/[id]` | Detail pesanan + timeline + lacak seller + banner CANCELLED | ✅ Selesai |
+| `/order/[id]/nota` | Nota/bukti pesanan | ✅ Selesai |
+| `/history` | Riwayat semua pesanan | ✅ Selesai |
+
+### Seller
+
+| Route | Halaman | Status |
+|-------|---------|--------|
+| `/register/seller` | Registrasi seller (nama usaha, foto, lokasi, jam) | ✅ Selesai |
+| `/seller` | Dashboard seller — statistik & pesanan aktif | ✅ Selesai |
+| `/seller/orders` | 3 tab: Tersedia / Pesananku / Selesai, auto-refresh 30 detik | ✅ Selesai |
+| `/seller/orders/[id]` | Detail + tombol aksi per status + upload bukti + GPS | ✅ Selesai |
+| `/seller/profile` | Edit profil usaha, foto, jam, toggle ketersediaan | ✅ Selesai |
+
+### Admin
+
+| Route | Halaman | Status |
+|-------|---------|--------|
+| `/admin` | Dashboard statistik | ✅ Selesai |
+| `/admin/orders` | Semua pesanan + filter | ✅ Selesai |
+| `/admin/orders/[id]` | Detail (view-only) + Cancel Dialog + Re-assign Dialog | ✅ Selesai |
+| `/admin/orders/[id]/nota` | Nota admin | ✅ Selesai |
+| `/admin/users` | Daftar pelanggan | ✅ Selesai |
+| `/admin/sellers` | Daftar seller + approve/reject | ✅ Selesai |
+| `/admin/sellers/[id]` | Detail profil seller | ✅ Selesai |
+
+---
+
+## 9. API Endpoints
+
+### Autentikasi & Pengguna
+
+| Method | Endpoint | Role | Deskripsi | Status |
+|--------|----------|------|-----------|--------|
+| `POST` | `/api/register` | Public | Daftar akun customer | ✅ |
+| `POST` | `/api/auth/[...nextauth]` | Public | Login/Logout | ✅ |
+| `GET` | `/api/users` | Admin | Daftar semua customer | ✅ |
+
+### Pesanan
+
+| Method | Endpoint | Role | Deskripsi | Status |
+|--------|----------|------|-----------|--------|
+| `GET` | `/api/orders` | All | Seller dapat `{ orders, nearbyOrders }`, Customer/Admin hanya orders | ✅ |
+| `POST` | `/api/orders` | Customer | Buat pesanan baru (dengan customerLat/Lng) | ✅ |
+| `GET` | `/api/orders/[id]` | All | Detail pesanan; Seller bisa lihat PENDING order orang lain | ✅ |
+| `PATCH` | `/api/orders/[id]/status` | Seller | Update status CONFIRMED sampai DELIVERED | ✅ |
+| `PATCH` | `/api/orders/[id]/weight` | Seller | Konfirmasi berat + foto bukti -> auto PROCESSING | ✅ |
+| `POST` | `/api/orders/[id]/take` | Seller | Self-assign pesanan PENDING dalam 5km | ✅ |
+| `POST` | `/api/orders/[id]/cancel` | Admin | Batalkan pesanan (alasan wajib >= 5 karakter) | ✅ |
+| `POST` | `/api/orders/[id]/reassign` | Admin | Re-assign seller (alasan wajib, newSellerId opsional) | ✅ |
+
+### Paket Laundry
+
+| Method | Endpoint | Role | Deskripsi | Status |
+|--------|----------|------|-----------|--------|
+| `GET` | `/api/packages` | Public | Daftar paket laundry | ✅ |
+
+### Seller
+
+| Method | Endpoint | Role | Deskripsi | Status |
+|--------|----------|------|-----------|--------|
+| `POST` | `/api/sellers/register` | Public | Daftarkan akun seller + profil | ✅ |
+| `GET` | `/api/sellers` | Admin | List semua seller | ✅ |
+| `GET` | `/api/sellers/[id]` | Admin/Seller | Detail seller | ✅ |
+| `PATCH` | `/api/sellers/[id]/approve` | Admin | Approve/reject seller | ✅ |
+| `PATCH` | `/api/sellers/[id]/availability` | Seller | Toggle ketersediaan | ✅ |
+| `PATCH` | `/api/sellers/[id]/location` | Seller | Update lokasi real-time | ✅ |
+
+### Notifikasi & Upload
+
+| Method | Endpoint | Role | Deskripsi | Status |
+|--------|----------|------|-----------|--------|
+| `GET` | `/api/notifications` | Auth | Ambil notifikasi pengguna | ✅ |
+| `PATCH` | `/api/notifications/read` | Auth | Tandai semua sudah dibaca | ✅ |
+| `POST` | `/api/upload` | Auth | Upload file gambar (foto bukti timbangan) | ✅ |
+
+---
+
+## 10. Struktur Folder Proyek
 
 ```
 signature-laundry/
+├── server.ts                              ✅ Custom server Socket.io
+├── tsconfig.server.json                   ✅
+├── PRD.md                                 ✅ Dokumen ini
+├── public/uploads/sellers/                ✅ Foto seller & bukti timbangan
 ├── app/
+│   ├── context/ThemeContext.tsx           ✅
 │   ├── (auth)/
-│   │   ├── login/page.tsx
-│   │   └── register/page.tsx
+│   │   ├── login/page.tsx                 ✅ Redirect role-based
+│   │   ├── register/page.tsx              ✅ + tombol Daftar sebagai Seller
+│   │   └── register/seller/page.tsx       ✅
 │   ├── (customer)/
-│   │   ├── dashboard/page.tsx
-│   │   ├── order/
-│   │   │   ├── new/page.tsx
-│   │   │   └── [id]/page.tsx
-│   │   └── history/page.tsx
+│   │   ├── dashboard/page.tsx             ✅
+│   │   ├── history/page.tsx               ✅
+│   │   └── order/
+│   │       ├── new/page.tsx               ✅ Estimasi berat + pin lokasi
+│   │       └── [id]/
+│   │           ├── page.tsx               ✅ Banner CANCELLED + menunggu berat
+│   │           └── nota/page.tsx          ✅
+│   ├── (seller)/
+│   │   ├── layout.tsx                     ✅
+│   │   └── seller/
+│   │       ├── page.tsx                   ✅ Dashboard
+│   │       ├── profile/page.tsx           ✅
+│   │       └── orders/
+│   │           ├── page.tsx               ✅ 3 tab + auto-refresh 30 detik
+│   │           └── [id]/page.tsx          ✅ Full management + GPS + upload bukti
 │   ├── (admin)/
 │   │   └── admin/
-│   │       ├── page.tsx
-│   │       ├── orders/
-│   │       │   ├── page.tsx
-│   │       │   └── [id]/page.tsx
-│   │       └── users/page.tsx
-│   ├── api/
-│   │   ├── auth/[...nextauth]/route.ts
-│   │   ├── register/route.ts
-│   │   ├── orders/
-│   │   │   ├── route.ts
-│   │   │   └── [id]/
-│   │   │       ├── route.ts
-│   │   │       └── status/route.ts
-│   │   └── packages/route.ts
-│   ├── layout.tsx
-│   └── page.tsx
+│   │       ├── page.tsx                   ✅
+│   │       ├── users/page.tsx             ✅
+│   │       ├── sellers/
+│   │       │   ├── page.tsx               ✅
+│   │       │   └── [id]/page.tsx          ✅
+│   │       └── orders/
+│   │           ├── page.tsx               ✅
+│   │           └── [id]/
+│   │               ├── page.tsx           ✅ View-only + Cancel + Reassign dialog
+│   │               └── nota/page.tsx      ✅
+│   └── api/
+│       ├── auth/[...nextauth]/route.ts    ✅
+│       ├── register/route.ts              ✅
+│       ├── packages/route.ts              ✅
+│       ├── users/route.ts                 ✅
+│       ├── upload/route.ts                ✅
+│       ├── notifications/
+│       │   ├── route.ts                   ✅
+│       │   └── read/route.ts              ✅
+│       ├── sellers/
+│       │   ├── register/route.ts          ✅
+│       │   └── [id]/
+│       │       ├── route.ts               ✅
+│       │       ├── approve/route.ts       ✅
+│       │       ├── availability/route.ts  ✅
+│       │       └── location/route.ts      ✅
+│       └── orders/
+│           ├── route.ts                   ✅ SELLER: { orders, nearbyOrders }
+│           └── [id]/
+│               ├── route.ts               ✅ Seller bisa lihat PENDING
+│               ├── status/route.ts        ✅ Seller kelola semua status
+│               ├── weight/route.ts        ✅ Konfirmasi berat + foto
+│               ├── take/route.ts          ✅ Self-assign
+│               ├── cancel/route.ts        ✅ Admin cancel + alasan wajib
+│               └── reassign/route.ts      ✅ Admin reassign + alasan wajib
 ├── components/
 │   ├── layout/
-│   │   ├── Navbar.tsx
-│   │   └── AdminSidebar.tsx
-│   ├── order/
-│   │   ├── OrderCard.tsx
-│   │   ├── StatusStepper.tsx
-│   │   └── PriceCalculator.tsx
-│   └── ui/
-│       └── PageLoader.tsx
+│   │   ├── Navbar.tsx                     ✅ + NotificationBell
+│   │   ├── AdminSidebar.tsx               ✅ + menu Seller
+│   │   └── SellerSidebar.tsx              ✅
+│   ├── map/
+│   │   ├── LocationPicker.tsx             ✅ Customer pin lokasi
+│   │   └── LiveTrackingMap.tsx            ✅ Real-time tracking
+│   ├── notifications/
+│   │   └── NotificationBell.tsx           ✅
+│   └── order/
+│       ├── OrderCard.tsx                  ✅
+│       ├── NotaView.tsx                   ✅
+│       └── StatusStepper.tsx              ✅ 10 status + CANCELLED handling
 ├── lib/
-│   ├── prisma.ts
-│   └── auth.ts
-├── middleware.ts
-├── prisma/
-│   ├── schema.prisma
-│   └── seed.ts
-├── types/
-│   └── next-auth.d.ts
-├── .env.local
-├── package.json
-└── PRD.md
+│   ├── prisma.ts                          ✅
+│   ├── auth.ts                            ✅ Role-based JWT
+│   ├── haversine.ts                       ✅
+│   └── notifications.ts                   ✅
+├── middleware.ts                           ✅ Proteksi /seller/* + /admin/*
+├── prisma/schema.prisma                   ✅ 3 role + 10 status + 5 model
+└── types/next-auth.d.ts                   ✅
 ```
 
 ---
 
-## 9. Non-Functional Requirements
+## 11. Non-Functional Requirements
 
 | Aspek | Target |
 |-------|--------|
 | Performa | Halaman load < 3 detik |
-| Responsif | Mobile-first (MUI breakpoints: xs, sm, md, lg) |
-| Keamanan | Password ter-hash (bcrypt, salt 12), session JWT, validasi input |
-| Aksesibilitas | Mengikuti standar MUI accessibility |
-| Skalabilitas | Struktur siap dikembangkan untuk multi-cabang |
+| Responsif | Mobile-first (MUI breakpoints) |
+| Keamanan | bcrypt hash, JWT session, validasi role di setiap API |
+| Real-time | GPS update < 2 detik latency via Socket.io |
+| Jangkauan Seller | Radius maksimum 5 km dari lokasi pin customer |
+| Delivery Fee | Rp 1.000/km (Reguler), gratis (Express) |
+| Anti-Fraud | Foto bukti timbangan wajib dilampirkan seller |
+| TypeScript | 0 compile errors (`npx tsc --noEmit`) |
 
 ---
 
-## 10. Data Awal (Seed Data)
+## 12. Rencana Implementasi & Status
 
-```
-Admin Default:
-  Nama  : Admin Signature Laundry
-  Email : admin@signaturelaundry.com
-  Password : admin123
+### Fase 1 — Core (Selesai)
+Setup project, auth, middleware, paket laundry, pesanan dasar, 6 status awal, dashboard admin, daftar pelanggan.
 
-Paket Laundry:
-  1. Reguler  — Rp 5.000/kg  — Estimasi 3 hari
-  2. Express  — Rp 10.000/kg — Estimasi 1 hari
-```
+### Fase 2 — Nota & Berat (Selesai)
+Admin input berat, nota pelanggan & admin, NotaView component, weight API, fix async params.
 
----
+### Fase 3 — SELLER Role (Selesai)
 
-## 11. Urutan Implementasi
+**A — Foundation:** Socket.io, Leaflet, schema update, haversine.ts, notifications.ts, upload API
 
-| Tahap | Task | Prioritas |
-|-------|------|-----------|
-| 1 | Setup Next.js + install dependensi | HIGH |
-| 2 | Prisma schema + MySQL + seed | HIGH |
-| 3 | NextAuth setup (login, session, role) | HIGH |
-| 4 | API Routes | HIGH |
-| 5 | Middleware proteksi route | HIGH |
-| 6 | MUI Theme + Layout | MEDIUM |
-| 7 | Halaman Auth (Login, Register) | HIGH |
-| 8 | Halaman Customer | HIGH |
-| 9 | Halaman Admin | HIGH |
+**B — Seller Auth:** Register seller, approve/reject, availability, location update
 
----
+**C — Admin Seller Management:** /admin/sellers, AdminSidebar update
 
-## 12. Environment Variables
+**D — Self-Assign Flow:** /take endpoint, seller lihat PENDING terdekat, 3-tab orders page
 
-```env
-# Database
-DATABASE_URL="mysql://user:password@localhost:3306/signature_laundry"
+**E — Seller Kelola Status:** /status endpoint (CONFIRMED→DELIVERED), /weight endpoint (auto PROCESSING + foto wajib), seller orders [id] page lengkap
 
-# NextAuth
-NEXTAUTH_SECRET="your-secret-key"
-NEXTAUTH_URL="http://localhost:3000"
-```
+**F — Admin View-only + Darurat:** Admin orders [id] rewrite (view + Cancel + Reassign dialog), /cancel, /reassign endpoints
+
+**G — Maps & Real-time:** LocationPicker, LiveTrackingMap, socket.io tracking, /order/new pin lokasi
+
+**H — Customer View Update:** Banner menunggu berat, banner CANCELLED + alasan, StatusStepper 10 status
+
+**I — Notifications & Middleware:** NotificationBell, proteksi /seller/*, 0 TypeScript errors
 
 ---
 
-*Dokumen ini merupakan panduan pengembangan resmi untuk Signature Laundry v1.0*
-*Dibuat: Maret 2026 | Tim Pengembang: Signature Laundry Dev Team*
+## 13. Log Bug & Perbaikan
+
+| # | Bug | File Terdampak | Status |
+|---|-----|----------------|--------|
+| 1 | `useThemeContext` tidak diekspor, harusnya `useThemeMode` | `SellerSidebar.tsx` | Selesai |
+| 2 | Login SELLER diredirect ke `/dashboard` (loop redirect middleware) | `login/page.tsx` | Selesai |
+| 3 | Port preview server bentrok, lock file tidak dihapus | `.next/dev/lock` | Selesai |
+| 4 | `StatusStepper` dipanggil tanpa prop `statusHistory` | `admin/orders/[id]/page.tsx` | Selesai |
+| 5 | LiveTrackingMap menggunakan prop `sellerPos` yang tidak ada | `seller/orders/[id]/page.tsx` | Selesai |
+| 6 | `nearest.distance` tidak dikenali TypeScript pada SellerProfile type | `assign-seller/route.ts` | Selesai |
+| 7 | `CANCELLED` belum ada di Prisma enum (schema belum di-push) | `cancel/route.ts`, `status/route.ts` | Selesai (cast sementara) |
+| 8 | `weightProofUrl` belum ada di Prisma schema (belum di-push) | `weight/route.ts` | Selesai (cast sementara) |
+| 9 | `(user as { role: string })` menyebabkan TS error di auth callbacks | `lib/auth.ts` | Selesai |
+| 10 | `Record<OrderStatus, string>` error karena `CANCELLED` belum di enum | `status/route.ts` | Selesai |
+
+> **Catatan Bug 7 & 8:** Ini adalah workaround sementara (`as any` cast) hingga `npx prisma db push`
+> dijalankan dengan XAMPP aktif. Setelah push, cast bisa dihapus dan TypeScript akan mengenali
+> field `weightProofUrl`, `cancelReason`, dan status `CANCELLED` secara native.
+
+---
+
+*Dokumen ini merupakan panduan resmi pengembangan Signature Laundry v3.0*
+*Terakhir diperbarui: 19 Maret 2026*

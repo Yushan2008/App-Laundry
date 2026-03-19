@@ -24,23 +24,36 @@ import {
   Phone,
   Home,
   Receipt,
+  Cancel,
+  HourglassTop,
 } from "@mui/icons-material";
 import { useRouter, useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Navbar from "@/components/layout/Navbar";
 import StatusStepper from "@/components/order/StatusStepper";
 import { useThemeMode } from "@/app/context/ThemeContext";
+import dynamic from "next/dynamic";
+import io from "socket.io-client";
+
+const LiveTrackingMap = dynamic(
+  () => import("@/components/map/LiveTrackingMap"),
+  { ssr: false, loading: () => <CircularProgress /> }
+);
 
 const STATUS_CONFIG: Record<
   string,
   { label: string; color: "default" | "warning" | "info" | "primary" | "secondary" | "success" | "error"; dot: string }
 > = {
   PENDING: { label: "Menunggu", color: "warning", dot: "#f59e0b" },
-  PROCESSING: { label: "Diproses", color: "info", dot: "#3b82f6" },
+  CONFIRMED: { label: "Dikonfirmasi", color: "secondary", dot: "#8b5cf6" },
+  PICKED_UP: { label: "Dijemput", color: "info", dot: "#3b82f6" },
+  PROCESSING: { label: "Diproses", color: "info", dot: "#06b6d4" },
   WASHING: { label: "Dicuci", color: "primary", dot: "#4f46e5" },
   DRYING: { label: "Disetrika", color: "secondary", dot: "#0d9488" },
   READY: { label: "Siap Diambil", color: "success", dot: "#10b981" },
+  OUT_FOR_DELIVERY: { label: "Dalam Pengiriman", color: "warning", dot: "#f97316" },
   DELIVERED: { label: "Selesai", color: "default", dot: "#64748b" },
+  CANCELLED: { label: "Dibatalkan", color: "error", dot: "#ef4444" },
 };
 
 interface Order {
@@ -48,11 +61,17 @@ interface Order {
   orderNumber: string;
   status: string;
   weight: number | null;
+  weightProofUrl: string | null;
   totalPrice: number | null;
+  deliveryFee: number | null;
+  customerLat: number | null;
+  customerLng: number | null;
   notes: string | null;
+  cancelReason: string | null;
   createdAt: string;
   package: { name: string; pricePerKg: number; durationDays: number };
   user: { name: string; email: string; phone: string | null; address: string | null };
+  seller: { name: string; phone: string | null } | null;
   statusHistory: { id: string; status: string; description: string | null; createdAt: string }[];
 }
 
@@ -88,6 +107,8 @@ export default function OrderDetailPage() {
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [sellerPos, setSellerPos] = useState<{ lat: number; lng: number } | null>(null);
+  const socketRef = useRef<ReturnType<typeof io> | null>(null);
 
   const isDark = mode === "dark";
   const id = Array.isArray(params.id) ? params.id[0] : (params.id as string);
@@ -104,6 +125,15 @@ export default function OrderDetailPage() {
         setError("Gagal memuat data pesanan. Silakan refresh halaman.");
         setLoading(false);
       });
+
+    // Connect Socket.io untuk lacak seller
+    socketRef.current = io();
+    socketRef.current.emit("track-order", id);
+    socketRef.current.on("seller-location", (pos: { lat: number; lng: number }) => {
+      setSellerPos(pos);
+    });
+
+    return () => { socketRef.current?.disconnect(); };
   }, [id]);
 
   if (loading) {
@@ -179,6 +209,31 @@ export default function OrderDetailPage() {
           </Button>
         </Box>
 
+        {/* Banner Dibatalkan */}
+        {order.status === "CANCELLED" && (
+          <Alert
+            severity="error"
+            icon={<Cancel />}
+            sx={{ mb: 3, borderRadius: 2, fontWeight: 600 }}
+          >
+            <Typography variant="body2" fontWeight={700} mb={order.cancelReason ? 0.5 : 0}>
+              Pesanan ini telah dibatalkan oleh admin.
+            </Typography>
+            {order.cancelReason && (
+              <Typography variant="caption" display="block">
+                Alasan: {order.cancelReason}
+              </Typography>
+            )}
+          </Alert>
+        )}
+
+        {/* Banner Menunggu Berat */}
+        {!order.weight && !["PENDING", "CANCELLED"].includes(order.status) && (
+          <Alert severity="warning" icon={<HourglassTop />} sx={{ mb: 3, borderRadius: 2 }}>
+            Seller sedang dalam proses menjemput dan menimbang cucian Anda. Harga total akan dikonfirmasi setelah penimbangan selesai.
+          </Alert>
+        )}
+
         <Grid container spacing={3}>
           {/* Left Column */}
           <Grid item xs={12} md={5}>
@@ -198,7 +253,7 @@ export default function OrderDetailPage() {
                 <InfoRow
                   icon={<Scale fontSize="small" />}
                   label="Berat Cucian"
-                  value={order.weight ? `${order.weight} kg` : "Belum ditimbang"}
+                  value={order.weight ? `${order.weight} kg` : "Menunggu konfirmasi berat dari seller"}
                 />
                 <InfoRow
                   icon={<CalendarToday fontSize="small" />}
@@ -241,20 +296,57 @@ export default function OrderDetailPage() {
                 )}
 
                 <Divider sx={{ mb: 2 }} />
-                <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <Typography variant="body1" fontWeight={700} color="text.primary">
-                    Total Harga
-                  </Typography>
-                  {order.totalPrice ? (
-                    <Typography variant="h5" color="primary.main" fontWeight={800}>
-                      Rp {order.totalPrice.toLocaleString("id-ID")}
-                    </Typography>
-                  ) : (
-                    <Typography variant="body2" color="text.disabled" fontStyle="italic" fontWeight={600}>
-                      Menunggu konfirmasi admin...
-                    </Typography>
-                  )}
-                </Box>
+                {order.totalPrice ? (
+                  <>
+                    <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        Laundry ({order.weight} kg × Rp {order.package.pricePerKg.toLocaleString("id-ID")})
+                      </Typography>
+                      <Typography variant="body2" fontWeight={600}>Rp {order.totalPrice.toLocaleString("id-ID")}</Typography>
+                    </Box>
+                    <Box sx={{ display: "flex", justifyContent: "space-between", mb: 2 }}>
+                      <Typography variant="body2" color="text.secondary">Ongkir</Typography>
+                      <Typography variant="body2" fontWeight={600} color="primary.main">
+                        {order.deliveryFee != null
+                          ? order.deliveryFee === 0 ? "Gratis" : `Rp ${order.deliveryFee.toLocaleString("id-ID")}`
+                          : "—"}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <Typography variant="body1" fontWeight={700} color="text.primary">Total Harga</Typography>
+                      <Typography variant="h5" color="primary.main" fontWeight={800}>
+                        Rp {(order.totalPrice + (order.deliveryFee ?? 0)).toLocaleString("id-ID")}
+                      </Typography>
+                    </Box>
+                  </>
+                ) : order.status === "CANCELLED" ? (
+                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <Typography variant="body1" fontWeight={700} color="text.primary">Total Harga</Typography>
+                    <Typography variant="body2" color="error" fontWeight={600}>Pesanan dibatalkan</Typography>
+                  </Box>
+                ) : (
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1,
+                      p: 1.5,
+                      borderRadius: 2,
+                      bgcolor: isDark ? "rgba(234,179,8,0.08)" : "#fefce8",
+                      border: "1px solid #fde68a",
+                    }}
+                  >
+                    <HourglassTop sx={{ fontSize: 18, color: "warning.main" }} />
+                    <Box>
+                      <Typography variant="body2" fontWeight={700} color="warning.dark">
+                        Menunggu konfirmasi berat dari seller
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Harga akan ditampilkan setelah seller menimbang cucian
+                      </Typography>
+                    </Box>
+                  </Box>
+                )}
               </CardContent>
             </Card>
 
@@ -302,6 +394,33 @@ export default function OrderDetailPage() {
                   </Typography>
                 </Box>
                 <Divider sx={{ mb: 3 }} />
+
+                {/* Peta tracking real-time saat seller menuju/mengantarkan */}
+                {(order.status === "OUT_FOR_DELIVERY" || order.status === "CONFIRMED") && order.customerLat && order.customerLng && (
+                  <Box mb={3}>
+                    <Typography variant="subtitle2" fontWeight={600} mb={1.5} color="warning.main">
+                      🛵 Seller sedang dalam perjalanan — lacak di bawah ini
+                    </Typography>
+                    {order.seller && (
+                      <Typography variant="caption" color="text.secondary" mb={1} display="block">
+                        Seller: {order.seller.name} {order.seller.phone && `• ${order.seller.phone}`}
+                      </Typography>
+                    )}
+                    <LiveTrackingMap
+                      customerLat={order.customerLat}
+                      customerLng={order.customerLng}
+                      sellerLat={sellerPos?.lat}
+                      sellerLng={sellerPos?.lng}
+                      mode="customer"
+                    />
+                    {!sellerPos && (
+                      <Typography variant="caption" color="text.secondary" mt={1} display="block">
+                        Menunggu seller membagikan lokasi...
+                      </Typography>
+                    )}
+                  </Box>
+                )}
+
                 <StatusStepper
                   currentStatus={order.status}
                   statusHistory={order.statusHistory}

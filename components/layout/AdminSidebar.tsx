@@ -22,16 +22,19 @@ import {
   Logout,
   WbSunny,
   DarkMode,
+  Store,
 } from "@mui/icons-material";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter, usePathname } from "next/navigation";
 import { useThemeMode } from "@/app/context/ThemeContext";
+import NotificationBell from "@/components/notifications/NotificationBell";
 
 const DRAWER_WIDTH = 248;
 
 const menuItems = [
   { label: "Dashboard", icon: <Dashboard fontSize="small" />, path: "/admin" },
   { label: "Kelola Pesanan", icon: <Assignment fontSize="small" />, path: "/admin/orders" },
+  { label: "Kelola Seller", icon: <Store fontSize="small" />, path: "/admin/sellers" },
   { label: "Data Pelanggan", icon: <People fontSize="small" />, path: "/admin/users" },
 ];
 
@@ -158,6 +161,11 @@ export default function AdminSidebar() {
       {/* Bottom Section */}
       <Box sx={{ p: 2 }}>
         <Divider sx={{ borderColor: "rgba(255,255,255,0.07)", mb: 2 }} />
+
+        {/* Notifications */}
+        <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 1 }}>
+          <NotificationBell />
+        </Box>
 
         {/* Dark Mode Toggle */}
         <Box

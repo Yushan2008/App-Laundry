@@ -24,6 +24,7 @@ import {
   WbSunny,
   DarkMode,
   CheckCircle,
+  Store,
 } from "@mui/icons-material";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -365,6 +366,34 @@ export default function RegisterPage() {
               Masuk di sini
             </Link>
           </Typography>
+
+          <Divider sx={{ my: 3 }}>
+            <Typography variant="caption" color="text.disabled">
+              Mau jadi mitra?
+            </Typography>
+          </Divider>
+
+          <Button
+            fullWidth
+            variant="outlined"
+            size="large"
+            startIcon={<Store />}
+            onClick={() => router.push("/register/seller")}
+            sx={{
+              py: 1.4,
+              fontWeight: 700,
+              borderColor: "#0d9488",
+              color: "#0d9488",
+              borderWidth: 2,
+              "&:hover": {
+                borderWidth: 2,
+                borderColor: "#0f766e",
+                bgcolor: "rgba(13,148,136,0.06)",
+              },
+            }}
+          >
+            Daftar sebagai Seller / Mitra Antar-Jemput
+          </Button>
         </Box>
       </Box>
     </Box>
