@@ -2,6 +2,7 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "module": "CommonJS",
+    "moduleResolution": "node",
     "target": "ES2017",
     "outDir": ".server",
     "noEmit": false

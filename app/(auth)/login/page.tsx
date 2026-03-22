@@ -2,8 +2,6 @@
 
 import {
   Box,
-  Card,
-  CardContent,
   TextField,
   Button,
   Typography,
@@ -12,6 +10,7 @@ import {
   IconButton,
   Divider,
   useTheme,
+  CircularProgress,
 } from "@mui/material";
 import {
   Email,
@@ -22,20 +21,39 @@ import {
   WbSunny,
   DarkMode,
 } from "@mui/icons-material";
-import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { signIn, getSession } from "next-auth/react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useState, Suspense } from "react";
 import Link from "next/link";
 import { useThemeMode } from "@/app/context/ThemeContext";
 
-export default function LoginPage() {
+const NEXTAUTH_ERROR_MESSAGES: Record<string, string> = {
+  OAuthSignin: "Terjadi kesalahan saat memulai login. Coba lagi.",
+  OAuthCallback: "Terjadi kesalahan saat proses callback. Coba lagi.",
+  OAuthCreateAccount: "Tidak bisa membuat akun. Coba lagi.",
+  EmailCreateAccount: "Tidak bisa membuat akun. Coba lagi.",
+  Callback: "Terjadi kesalahan callback. Coba lagi.",
+  OAuthAccountNotLinked: "Akun sudah terdaftar dengan metode lain.",
+  EmailSignin: "Gagal mengirim email. Periksa alamat email Anda.",
+  CredentialsSignin: "Email atau password salah. Coba lagi.",
+  SessionRequired: "Silakan masuk untuk mengakses halaman tersebut.",
+  Default: "Terjadi kesalahan. Coba lagi.",
+};
+
+function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const theme = useTheme();
   const { mode, toggleMode } = useThemeMode();
   const [form, setForm] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Tangkap error dari NextAuth (misalnya setelah redirect dari signOut atau akses terlarang)
+  const urlError = searchParams.get("error");
+  const [error, setError] = useState(
+    urlError ? (NEXTAUTH_ERROR_MESSAGES[urlError] ?? NEXTAUTH_ERROR_MESSAGES.Default) : ""
+  );
 
   const isDark = mode === "dark";
 
@@ -50,14 +68,14 @@ export default function LoginPage() {
       redirect: false,
     });
 
-    if (res?.error) {
+    if (res?.error || !res?.ok) {
       setError("Email atau password salah. Coba lagi.");
       setLoading(false);
       return;
     }
 
-    const sessionRes = await fetch("/api/auth/session");
-    const session = await sessionRes.json();
+    // getSession() lebih reliable daripada fetch manual setelah signIn
+    const session = await getSession();
     const role = session?.user?.role;
     const dest = role === "ADMIN" ? "/admin" : role === "SELLER" ? "/seller" : "/dashboard";
     router.push(dest);
@@ -296,5 +314,22 @@ export default function LoginPage() {
         </Box>
       </Box>
     </Box>
+  );
+}
+
+function LoginPageFallback() {
+  return (
+    <Box display="flex" minHeight="100vh" alignItems="center" justifyContent="center" bgcolor="background.default">
+      <CircularProgress />
+    </Box>
+  );
+}
+
+// Wrapper dengan Suspense agar useSearchParams aman di App Router
+export default function LoginPageWrapper() {
+  return (
+    <Suspense fallback={<LoginPageFallback />}>
+      <LoginPage />
+    </Suspense>
   );
 }

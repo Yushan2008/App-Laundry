@@ -10,6 +10,7 @@ import {
 import {
   ArrowBack, DirectionsBike, CheckCircle, LocalShipping, Person,
   Phone, LocationOn, Inventory, Scale, PhotoCamera, MyLocation,
+  Navigation,
 } from "@mui/icons-material";
 import SellerSidebar from "@/components/layout/SellerSidebar";
 import io from "socket.io-client";
@@ -37,15 +38,8 @@ interface Order {
   sellerId: string | null;
 }
 
-// Tombol aksi berdasarkan status
-const ACTION_BUTTONS: Record<string, { label: string; newStatus: string; icon: React.ReactNode; color: "primary" | "success" | "warning" | "info" | "secondary" }> = {
-  CONFIRMED: { label: "Mulai Jemput", newStatus: "PICKED_UP", icon: <DirectionsBike />, color: "primary" },
-  WASHING: { label: "Mulai Cuci", newStatus: "WASHING", icon: <Inventory />, color: "info" },
-  DRYING: { label: "Mulai Keringkan", newStatus: "DRYING", icon: <Inventory />, color: "secondary" },
-  READY: { label: "Siap Diantar", newStatus: "READY", icon: <CheckCircle />, color: "success" },
-  OUT_FOR_DELIVERY: { label: "Mulai Antar", newStatus: "OUT_FOR_DELIVERY", icon: <LocalShipping />, color: "warning" },
-  DELIVERED: { label: "Selesai Antar ✓", newStatus: "DELIVERED", icon: <CheckCircle />, color: "success" },
-};
+// Status yang membutuhkan GPS aktif
+const GPS_STATUSES = ["CONFIRMED", "PICKED_UP", "OUT_FOR_DELIVERY"];
 
 // Urutan status → tombol berikutnya
 const NEXT_STATUS: Record<string, string> = {
@@ -98,38 +92,71 @@ export default function SellerOrderDetailPage() {
       .catch(() => { setError("Gagal memuat pesanan"); setLoading(false); });
   }, [id]);
 
-  useEffect(() => {
-    fetchOrder();
-    socketRef.current = io();
-    return () => {
-      socketRef.current?.disconnect();
-      if (watchRef.current) navigator.geolocation.clearWatch(watchRef.current);
-    };
-  }, [fetchOrder]);
-
-  const startTracking = () => {
+  // Mulai tracking GPS & kirim ke Socket.io + simpan ke DB
+  const startTracking = useCallback(() => {
     if (!navigator.geolocation) { setError("Browser tidak mendukung geolocation"); return; }
+    if (watchRef.current) return; // Sudah tracking
     setTracking(true);
+
     watchRef.current = navigator.geolocation.watchPosition(
       (pos) => {
         const { latitude: lat, longitude: lng } = pos.coords;
         setSellerPos({ lat, lng });
-        socketRef.current?.emit("location-update", { orderId: id, lat, lng });
-        fetch(`/api/sellers/${session?.user?.id}/location`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ lat, lng }),
-        });
-      },
-      () => setError("Gagal mendapatkan lokasi"),
-      { enableHighAccuracy: true }
-    );
-  };
 
-  const stopTracking = () => {
+        // Kirim via Socket.io (real-time ke customer)
+        socketRef.current?.emit("location-update", { orderId: id, lat, lng });
+
+        // Simpan ke DB (fallback polling untuk customer)
+        if (session?.user?.id) {
+          fetch(`/api/sellers/${session.user.id}/location`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ lat, lng }),
+          });
+        }
+      },
+      (err) => {
+        console.error("GPS error:", err);
+        setError("Gagal mendapatkan lokasi GPS. Pastikan izin lokasi diaktifkan.");
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
+    );
+  }, [id, session?.user?.id]);
+
+  const stopTracking = useCallback(() => {
     setTracking(false);
-    if (watchRef.current) { navigator.geolocation.clearWatch(watchRef.current); watchRef.current = null; }
-  };
+    if (watchRef.current !== null) {
+      navigator.geolocation.clearWatch(watchRef.current);
+      watchRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchOrder();
+
+    // Inisialisasi Socket.io
+    const socket = io({ transports: ["websocket", "polling"] });
+    socketRef.current = socket;
+
+    socket.on("connect_error", () => {
+      // Socket.io tidak tersedia — mode polling saja (sudah di-handle di customer page)
+    });
+
+    return () => {
+      socket.disconnect();
+      if (watchRef.current !== null) navigator.geolocation.clearWatch(watchRef.current);
+    };
+  }, [fetchOrder]);
+
+  // Auto-start GPS jika pesanan sudah di status yang membutuhkan tracking
+  useEffect(() => {
+    if (!order || !session?.user?.id) return;
+    const isMine = order.sellerId === session.user.id;
+    if (isMine && GPS_STATUSES.includes(order.status) && order.status !== "DELIVERED") {
+      startTracking();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order?.status, session?.user?.id]);
 
   // Ambil pesanan (PENDING → CONFIRMED)
   const handleTakeOrder = async () => {
@@ -148,7 +175,7 @@ export default function SellerOrderDetailPage() {
     }
   };
 
-  // Update status
+  // Update status pesanan
   const handleAction = async (newStatus: string) => {
     setActionLoading(true);
     setError("");
@@ -222,6 +249,13 @@ export default function SellerOrderDetailPage() {
     }
   };
 
+  // Buka Google Maps navigasi ke lokasi pelanggan
+  const openGoogleMapsNavigation = () => {
+    if (!order?.customerLat || !order?.customerLng) return;
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${order.customerLat},${order.customerLng}&travelmode=driving`;
+    window.open(url, "_blank");
+  };
+
   if (loading) return (
     <Box display="flex" minHeight="100vh">
       <SellerSidebar />
@@ -233,7 +267,7 @@ export default function SellerOrderDetailPage() {
   const isPending = order?.status === "PENDING";
   const isPickedUp = order?.status === "PICKED_UP";
   const nextStatus = order ? NEXT_STATUS[order.status] : null;
-  const showMap = order?.customerLat && order?.customerLng && (
+  const showMap = order?.customerLat && order?.customerLng && isMine && (
     order.status === "CONFIRMED" || order.status === "PICKED_UP" || order.status === "OUT_FOR_DELIVERY"
   );
 
@@ -363,11 +397,6 @@ export default function SellerOrderDetailPage() {
                   <Typography variant="body2" color="text.secondary" mb={2}>
                     Pesanan ini belum diambil oleh seller manapun. Tekan tombol di bawah untuk mengklaim pesanan ini.
                   </Typography>
-                  {order.deliveryFee !== null && (
-                    <Typography variant="caption" color="text.secondary" display="block" mb={2}>
-                      Estimasi ongkir: Rp {order.deliveryFee?.toLocaleString("id-ID")}
-                    </Typography>
-                  )}
                   <Button
                     fullWidth
                     variant="contained"
@@ -390,7 +419,7 @@ export default function SellerOrderDetailPage() {
                     <Typography variant="h6" fontWeight={700}>Konfirmasi Berat Cucian</Typography>
                   </Box>
                   <Typography variant="body2" color="text.secondary" mb={2}>
-                    Timbang cucian pelanggan, upload foto bukti timbangan, lalu masukkan berat aktual. Pelanggan akan menerima notifikasi total biaya.
+                    Timbang cucian pelanggan, upload foto bukti timbangan, lalu masukkan berat aktual.
                   </Typography>
 
                   <TextField
@@ -411,7 +440,6 @@ export default function SellerOrderDetailPage() {
                     }
                   />
 
-                  {/* Upload foto bukti */}
                   <input
                     type="file"
                     accept="image/*"
@@ -455,19 +483,39 @@ export default function SellerOrderDetailPage() {
                 </Paper>
               )}
 
-              {/* Tombol aksi status (untuk pesanan milik seller) */}
+              {/* Tombol aksi status */}
               {isMine && order.status !== "PENDING" && order.status !== "DELIVERED" && order.status !== "CANCELLED" && nextStatus && (
                 <Paper sx={{ p: 3, borderRadius: 3, mb: 2 }}>
                   <Typography variant="h6" fontWeight={700} mb={2}>Aksi Pesanan</Typography>
 
-                  {/* GPS info */}
-                  {tracking && (
+                  {/* GPS status indicator */}
+                  {tracking ? (
                     <Alert severity="success" icon={<MyLocation />} sx={{ mb: 2 }}>
                       GPS aktif — Lokasi Anda sedang dikirim ke pelanggan secara real-time
                     </Alert>
+                  ) : GPS_STATUSES.includes(order.status) ? (
+                    <Alert severity="warning" icon={<MyLocation />} sx={{ mb: 2 }} action={
+                      <Button size="small" onClick={startTracking} color="warning">Aktifkan</Button>
+                    }>
+                      GPS belum aktif. Aktifkan agar pelanggan dapat melacak lokasi Anda.
+                    </Alert>
+                  ) : null}
+
+                  {/* Tombol navigasi Google Maps */}
+                  {(order.status === "CONFIRMED" || order.status === "OUT_FOR_DELIVERY") && order.customerLat && (
+                    <Button
+                      fullWidth
+                      variant="outlined"
+                      color="success"
+                      startIcon={<Navigation />}
+                      onClick={openGoogleMapsNavigation}
+                      sx={{ mb: 2, fontWeight: 700 }}
+                    >
+                      Buka Navigasi di Google Maps
+                    </Button>
                   )}
 
-                  {/* Tombol next status — skip weight step */}
+                  {/* Tombol next status */}
                   {order.status !== "PICKED_UP" && (
                     <Button
                       fullWidth
@@ -500,25 +548,29 @@ export default function SellerOrderDetailPage() {
                     </Button>
                   )}
 
-                  {/* Khusus PICKED_UP — harus konfirmasi berat dulu */}
                   {order.status === "PICKED_UP" && order.weight && (
                     <Alert severity="success">
-                      Berat sudah dikonfirmasi ({order.weight} kg). Lanjutkan ke proses cuci di atas.
+                      Berat sudah dikonfirmasi ({order.weight} kg). Lanjutkan proses cuci di atas.
                     </Alert>
                   )}
                   {order.status === "PICKED_UP" && !order.weight && (
                     <Alert severity="warning">
-                      Timbang dan konfirmasi berat cucian terlebih dahulu sebelum melanjutkan proses.
+                      Timbang dan konfirmasi berat cucian terlebih dahulu sebelum melanjutkan.
                     </Alert>
                   )}
                 </Paper>
               )}
 
-              {/* Peta lokasi */}
+              {/* Peta navigasi ke lokasi pelanggan */}
               {showMap && (
-                <Paper sx={{ p: 0, borderRadius: 3, overflow: "hidden" }}>
-                  <Box p={2}>
-                    <Typography variant="subtitle2" fontWeight={700}>Lokasi Pelanggan</Typography>
+                <Paper sx={{ borderRadius: 3, overflow: "hidden" }}>
+                  <Box p={2} display="flex" justifyContent="space-between" alignItems="center">
+                    <Typography variant="subtitle2" fontWeight={700}>
+                      {order.status === "OUT_FOR_DELIVERY" ? "Navigasi Antar ke Pelanggan" : "Navigasi Jemput ke Pelanggan"}
+                    </Typography>
+                    {sellerPos && (
+                      <Chip size="small" label="GPS Aktif" color="success" icon={<MyLocation sx={{ fontSize: 14 }} />} />
+                    )}
                   </Box>
                   <LiveTrackingMap
                     customerLat={order.customerLat!}
@@ -526,6 +578,7 @@ export default function SellerOrderDetailPage() {
                     sellerLat={sellerPos?.lat}
                     sellerLng={sellerPos?.lng}
                     mode="seller"
+                    height={320}
                   />
                 </Paper>
               )}

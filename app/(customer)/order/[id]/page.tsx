@@ -28,7 +28,7 @@ import {
   HourglassTop,
 } from "@mui/icons-material";
 import { useRouter, useParams } from "next/navigation";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import Navbar from "@/components/layout/Navbar";
 import StatusStepper from "@/components/order/StatusStepper";
 import { useThemeMode } from "@/app/context/ThemeContext";
@@ -109,16 +109,49 @@ export default function OrderDetailPage() {
   const [error, setError] = useState("");
   const [sellerPos, setSellerPos] = useState<{ lat: number; lng: number } | null>(null);
   const socketRef = useRef<ReturnType<typeof io> | null>(null);
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
   const isDark = mode === "dark";
   const id = Array.isArray(params.id) ? params.id[0] : (params.id as string);
+
+  // Status yang membutuhkan peta tracking
+  const TRACKABLE_STATUSES = ["CONFIRMED", "PICKED_UP", "OUT_FOR_DELIVERY"];
+
+  // Polling fallback: ambil lokasi seller dari DB setiap 5 detik
+  const startPolling = useCallback((orderId: string) => {
+    if (pollingRef.current) return;
+    pollingRef.current = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/orders/${orderId}/seller-location`);
+        const data = await res.json();
+        if (data.lat && data.lng) {
+          setSellerPos({ lat: data.lat, lng: data.lng });
+        }
+      } catch {
+        // Abaikan error polling
+      }
+    }, 5000);
+  }, []);
+
+  const stopPolling = useCallback(() => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+  }, []);
 
   useEffect(() => {
     fetch(`/api/orders/${id}`)
       .then((r) => r.json())
       .then((data) => {
         if (data.error) setError(data.error);
-        else setOrder(data.order);
+        else {
+          setOrder(data.order);
+          // Mulai polling jika pesanan sedang dalam status trackable
+          if (TRACKABLE_STATUSES.includes(data.order?.status)) {
+            startPolling(id);
+          }
+        }
         setLoading(false);
       })
       .catch(() => {
@@ -126,14 +159,24 @@ export default function OrderDetailPage() {
         setLoading(false);
       });
 
-    // Connect Socket.io untuk lacak seller
-    socketRef.current = io();
-    socketRef.current.emit("track-order", id);
-    socketRef.current.on("seller-location", (pos: { lat: number; lng: number }) => {
+    // Connect Socket.io (real-time) sebagai primary
+    const socket = io({ transports: ["websocket", "polling"] });
+    socketRef.current = socket;
+    socket.emit("track-order", id);
+    socket.on("seller-location", (pos: { lat: number; lng: number }) => {
       setSellerPos(pos);
     });
 
-    return () => { socketRef.current?.disconnect(); };
+    // Jika Socket.io tidak connect, polling sudah handle
+    socket.on("connect_error", () => {
+      startPolling(id);
+    });
+
+    return () => {
+      socket.disconnect();
+      stopPolling();
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   if (loading) {
@@ -395,15 +438,25 @@ export default function OrderDetailPage() {
                 </Box>
                 <Divider sx={{ mb: 3 }} />
 
-                {/* Peta tracking real-time saat seller menuju/mengantarkan */}
-                {(order.status === "OUT_FOR_DELIVERY" || order.status === "CONFIRMED") && order.customerLat && order.customerLng && (
+                {/* Peta tracking real-time: CONFIRMED, PICKED_UP, OUT_FOR_DELIVERY */}
+                {["CONFIRMED", "PICKED_UP", "OUT_FOR_DELIVERY"].includes(order.status) && order.customerLat && order.customerLng && (
                   <Box mb={3}>
-                    <Typography variant="subtitle2" fontWeight={600} mb={1.5} color="warning.main">
-                      🛵 Seller sedang dalam perjalanan — lacak di bawah ini
-                    </Typography>
+                    <Box display="flex" alignItems="center" gap={1} mb={1.5}>
+                      <Typography variant="subtitle2" fontWeight={700} color="primary.main">
+                        {order.status === "PICKED_UP"
+                          ? "🛵 Seller sedang menjemput cucian Anda"
+                          : order.status === "OUT_FOR_DELIVERY"
+                          ? "🚀 Seller sedang mengantarkan cucian Anda"
+                          : "🛵 Seller akan segera menjemput cucian Anda"}
+                      </Typography>
+                      {sellerPos && (
+                        <Chip size="small" label="Live" color="success" sx={{ fontWeight: 700, height: 20, fontSize: 10 }} />
+                      )}
+                    </Box>
                     {order.seller && (
-                      <Typography variant="caption" color="text.secondary" mb={1} display="block">
-                        Seller: {order.seller.name} {order.seller.phone && `• ${order.seller.phone}`}
+                      <Typography variant="caption" color="text.secondary" mb={1.5} display="block">
+                        Seller: <strong>{order.seller.name}</strong>
+                        {order.seller.phone && ` • ${order.seller.phone}`}
                       </Typography>
                     )}
                     <LiveTrackingMap
@@ -412,12 +465,8 @@ export default function OrderDetailPage() {
                       sellerLat={sellerPos?.lat}
                       sellerLng={sellerPos?.lng}
                       mode="customer"
+                      height={350}
                     />
-                    {!sellerPos && (
-                      <Typography variant="caption" color="text.secondary" mt={1} display="block">
-                        Menunggu seller membagikan lokasi...
-                      </Typography>
-                    )}
                   </Box>
                 )}
 

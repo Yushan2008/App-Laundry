@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "ts-node --project tsconfig.server.json server.ts",
+    "dev": "node scripts/free-port.js 3000 && rimraf .next/dev/cache/turbopack && ts-node --project tsconfig.server.json server.ts",
     "dev:next": "next dev",
     "build": "next build",
     "start": "next start",
